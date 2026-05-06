@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String?  @unique
+  nomorKK   String?  @unique
+  password  String
+  nama      String
+  role      String   // admin | warga
+  warga     Warga?
+  notifications Notification[]
+  createdAt DateTime @default(now())
+}
+
+model Warga {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  user      User     @relation(fields: [userId], references: [id])
+  makamId   Int?
+  makam     Makam?   @relation(fields: [makamId], references: [id])
+  alamat        String?
+  telepon       String?
+  jumlahMakam   Int      @default(1)
+  bulanTerbayar Int      @default(0)
+  daftarAlmarhum Json?
+  isFirstLogin   Boolean  @default(true)
+  iuran         Iuran[]
+  createdAt     DateTime @default(now())
+}
+
+model Makam {
+  id        Int      @id @default(autoincrement())
+  blok      String
+  nomor     String
+  warga     Warga[]
+  createdAt DateTime @default(now())
+}
+
+model Iuran {
+  id        Int      @id @default(autoincrement())
+  wargaId   Int
+  warga     Warga    @relation(fields: [wargaId], references: [id])
+  tahun     Int
+  bulan     Int
+  jumlah    Decimal  @db.Decimal(10, 2)
+  status    String   // belum_bayar | pending | lunas
+  metode    String?  // Transfer BCA, Tunai, dll
+  buktiBayar String?
+  tanggalBayar DateTime?
+  transaksiId String?   // Untuk grouping pembayaran sekaligus
+  catatanAdmin String?   // Alasan penolakan atau catatan tambahan
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Setting {
+  id    Int    @id @default(autoincrement())
+  key   String @unique
+  value String
+}
