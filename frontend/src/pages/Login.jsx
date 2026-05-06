@@ -114,10 +114,20 @@ export default function Login() {
               </div>
               <button
                 type="submit"
-                className="w-full bg-tertiary-fixed neubrutalist-border neubrutalist-shadow-sm p-sm font-headline-md text-headline-md text-on-tertiary-fixed uppercase neubrutalist-button transition-all mt-sm flex justify-center items-center gap-xs"
+                disabled={loading}
+                className={`w-full bg-tertiary-fixed neubrutalist-border neubrutalist-shadow-sm p-sm font-headline-md text-headline-md text-on-tertiary-fixed uppercase neubrutalist-button transition-all mt-sm flex justify-center items-center gap-xs ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
-                MASUK
-                <span className="material-symbols-outlined">login</span>
+                {loading ? (
+                  <>
+                    MOHON TUNGGU...
+                    <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                  </>
+                ) : (
+                  <>
+                    MASUK
+                    <span className="material-symbols-outlined">login</span>
+                  </>
+                )}
               </button>
             </form>
             <div className="border-t-4 border-black pt-md flex gap-sm mt-sm">
