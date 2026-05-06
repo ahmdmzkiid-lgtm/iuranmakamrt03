@@ -20,6 +20,6 @@
     "prisma": "^5.18.0"
   },
   "prisma": {
-    "seed": "node src/prisma/seed.js"
+    "seed": "node prisma/seed.js"
   }
 }
