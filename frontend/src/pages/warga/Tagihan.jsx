@@ -396,7 +396,7 @@ export default function WargaTagihan() {
                     <p className="font-label-bold uppercase text-[10px] mb-2">Scan QRIS untuk Bayar</p>
                     <div className="bg-white border-2 border-black p-2 inline-block neubrutal-shadow">
                       <img 
-                        src={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${paymentSettings.qris_url}`} 
+                        src={paymentSettings.qris_url.startsWith('http') ? paymentSettings.qris_url : `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${paymentSettings.qris_url}`} 
                         alt="QRIS" 
                         className="w-40 h-40 object-contain mx-auto"
                       />

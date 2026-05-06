@@ -484,7 +484,7 @@ export default function AdminIuran() {
               </div>
               <div className="p-6 flex justify-center bg-zinc-100">
                 <img 
-                  src={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${selectedBukti}`} 
+                  src={selectedBukti?.startsWith('http') ? selectedBukti : `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${selectedBukti}`} 
                   alt="Bukti Transfer" 
                   className="max-h-[70vh] object-contain border-4 border-black shadow-lg"
                   onError={(e) => {

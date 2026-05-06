@@ -2,22 +2,12 @@ import { Router } from 'express'
 import { verifyToken } from '../middleware/auth.js'
 import { PrismaClient } from '@prisma/client'
 import multer from 'multer'
-import path from 'path'
+import { storage } from '../utils/cloudinary.js'
 
 const router = Router()
 const prisma = new PrismaClient()
 
-// Multer configuration for QRIS
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/')
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9)
-    cb(null, 'qris-' + uniqueSuffix + path.extname(file.originalname))
-  }
-})
-
+// Multer configuration for QRIS using Cloudinary
 const upload = multer({ storage: storage })
 
 // Get all settings
@@ -49,7 +39,7 @@ router.post('/', verifyToken, upload.single('qris'), async (req, res) => {
     if (bank_holder !== undefined) updates.push({ key: 'bank_holder', value: bank_holder })
     
     if (req.file) {
-      updates.push({ key: 'qris_url', value: `/uploads/${req.file.filename}` })
+      updates.push({ key: 'qris_url', value: req.file.path })
     }
 
     // Upsert each setting

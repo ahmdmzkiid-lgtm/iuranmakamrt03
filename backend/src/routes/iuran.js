@@ -2,22 +2,12 @@ import { Router } from 'express'
 import { verifyToken } from '../middleware/auth.js'
 import { PrismaClient } from '@prisma/client'
 import multer from 'multer'
-import path from 'path'
+import { storage } from '../utils/cloudinary.js'
 
 const router = Router()
 const prisma = new PrismaClient()
 
-// Multer configuration
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/')
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9)
-    cb(null, 'bukti-' + uniqueSuffix + path.extname(file.originalname))
-  }
-})
-
+// Multer configuration using Cloudinary
 const upload = multer({ storage: storage })
 
 // Ambil semua Iuran (Warga: miliknya, Admin: semua)
@@ -47,7 +37,7 @@ router.get('/', verifyToken, async (req, res) => {
 router.post('/bayar', verifyToken, upload.single('buktiBayar'), async (req, res) => {
   try {
     const { iuranIds, metode } = req.body
-    const buktiBayar = req.file ? `/uploads/${req.file.filename}` : null
+    const buktiBayar = req.file ? req.file.path : null
     
     const ids = JSON.parse(iuranIds)
 
@@ -185,7 +175,7 @@ router.put('/:id/offline', verifyToken, async (req, res) => {
 router.post('/bayar-awal', verifyToken, upload.single('buktiBayar'), async (req, res) => {
   try {
     const { jumlahBulan, metode } = req.body
-    const buktiBayar = req.file ? `/uploads/${req.file.filename}` : null
+    const buktiBayar = req.file ? req.file.path : null
 
     if (metode !== 'Bayar Tunai' && !buktiBayar) {
       return res.status(400).json({ message: 'Bukti pembayaran wajib diunggah untuk transfer' })

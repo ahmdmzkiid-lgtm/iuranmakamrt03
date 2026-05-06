@@ -29,7 +29,8 @@ export default function AdminSetelan() {
           qris_url: res.data.qris_url || ''
         })
         if (res.data.qris_url) {
-          setPreviewUrl(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${res.data.qris_url}`)
+          const qrisUrl = res.data.qris_url
+          setPreviewUrl(qrisUrl.startsWith('http') ? qrisUrl : `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${qrisUrl}`)
         }
       } catch (error) {
         console.error('Failed to fetch settings', error)
