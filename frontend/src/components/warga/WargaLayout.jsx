@@ -28,8 +28,7 @@ export default function WargaLayout({ children }) {
   const isActive = (path) => location.pathname === path
 
   const handleLogout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('role')
+    localStorage.clear()
     navigate('/')
   }
 
