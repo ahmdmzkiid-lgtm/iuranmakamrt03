@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import AdminLayout from '../../components/admin/AdminLayout'
 import api from '../../services/api'
 import { useNotification } from '../../context/NotificationContext'
@@ -224,49 +224,73 @@ const PAGE_TX_SIZE = 10;
      return 0;
   })
 
-  const filteredDataRaw = dataIuran.filter(item => {
-    const itemPeriode = `${getBulanName(item.bulan)} ${item.tahun}`
-    const matchPeriode = periode === 'SEMUA' || itemPeriode === periode
-    const matchStatus = statusFilter === 'SEMUA' || item.status === statusFilter.toLowerCase()
-    const matchTipe = tipeFilter === 'SEMUA' || item.tipe === tipeFilter.toLowerCase()
-    return matchPeriode && matchStatus && matchTipe
-  })
+  const filteredDataRaw = useMemo(() => {
+    return dataIuran.filter(item => {
+      const itemPeriode = `${getBulanName(item.bulan)} ${item.tahun}`
+      const matchPeriode = periode === 'SEMUA' || itemPeriode === periode
+      const matchStatus = statusFilter === 'SEMUA' || item.status === statusFilter.toLowerCase()
+      const matchTipe = tipeFilter === 'SEMUA' || item.tipe === tipeFilter.toLowerCase()
+      return matchPeriode && matchStatus && matchTipe
+    })
+  }, [dataIuran, periode, statusFilter, tipeFilter])
 
   // Grouping logic for table
-  const groupedData = {}
-  filteredDataRaw.forEach(item => {
-    const key = item.transaksiId || `NON-${item.id}`
-    if (!groupedData[key]) {
-      groupedData[key] = {
-        ...item,
-        jumlah: 0,
-        bulanList: [],
-        isGrouped: !!item.transaksiId
+  const transaksiData = useMemo(() => {
+    const groupedData = {}
+    filteredDataRaw.forEach(item => {
+      const key = item.transaksiId || `NON-${item.id}`
+      if (!groupedData[key]) {
+        groupedData[key] = {
+          ...item,
+          jumlah: 0,
+          bulanList: [],
+          isGrouped: !!item.transaksiId
+        }
       }
-    }
-    groupedData[key].jumlah += Number(item.jumlah)
-    groupedData[key].bulanList.push({ bulan: item.bulan, tahun: item.tahun })
-  })
+      groupedData[key].jumlah += Number(item.jumlah)
+      groupedData[key].bulanList.push({ bulan: item.bulan, tahun: item.tahun })
+    })
 
-  const transaksiData = Object.values(groupedData).map(item => {
-    item.bulanList.sort((a, b) => (a.tahun - b.tahun) || (a.bulan - b.bulan))
-    let periodeStr = `${getBulanName(item.bulanList[0].bulan)} ${item.bulanList[0].tahun}`
-    if (item.bulanList.length > 1) {
-      const last = item.bulanList[item.bulanList.length - 1]
-      periodeStr += ` - ${getBulanName(last.bulan)} ${last.tahun}`
-    }
-    return { ...item, periodeDisplay: periodeStr }
-  }).reverse()
+    return Object.values(groupedData).map(item => {
+      item.bulanList.sort((a, b) => (a.tahun - b.tahun) || (a.bulan - b.bulan))
+      let periodeStr = `${getBulanName(item.bulanList[0].bulan)} ${item.bulanList[0].tahun}`
+      if (item.bulanList.length > 1) {
+        const last = item.bulanList[item.bulanList.length - 1]
+        periodeStr += ` - ${getBulanName(last.bulan)} ${last.tahun}`
+      }
+      return { ...item, periodeDisplay: periodeStr }
+    }).reverse()
+  }, [filteredDataRaw])
 
   const totalEstimasi = dataIuran.reduce((sum, item) => sum + Number(item.jumlah), 0)
   const totalTerbayar = dataIuran.filter(i => i.status === 'lunas').reduce((sum, item) => sum + Number(item.jumlah), 0)
   const totalBelum = totalEstimasi - totalTerbayar;
-const totalTxPages = Math.ceil(transaksiData.length / PAGE_TX_SIZE) || 1;
-const paginatedTransaksi = transaksiData.slice((currentTxPage - 1) * PAGE_TX_SIZE, currentTxPage * PAGE_TX_SIZE);
+  const totalTxPages = Math.ceil(transaksiData.length / PAGE_TX_SIZE) || 1;
+  const paginatedTransaksi = transaksiData.slice((currentTxPage - 1) * PAGE_TX_SIZE, currentTxPage * PAGE_TX_SIZE);
 
-useEffect(() => {
-  setCurrentTxPage(1);
-}, [transaksiData]);
+  useEffect(() => {
+    setCurrentTxPage(1);
+  }, [transaksiData]);
+
+  const getPageNumbers = () => {
+    const pages = []
+    const range = 1
+    for (let i = 1; i <= totalTxPages; i++) {
+      if (
+        i === 1 ||
+        i === totalTxPages ||
+        (i >= currentTxPage - range && i <= currentTxPage + range)
+      ) {
+        pages.push(i)
+      } else if (pages[pages.length - 1] !== '...') {
+        pages.push('...')
+      }
+    }
+    return pages
+  }
+
+  const startIndex = transaksiData.length === 0 ? 0 : (currentTxPage - 1) * PAGE_TX_SIZE + 1;
+  const endIndex = Math.min(currentTxPage * PAGE_TX_SIZE, transaksiData.length);
 
   return (
     <AdminLayout>
@@ -551,32 +575,50 @@ useEffect(() => {
                     )}
                   </tbody>
                 </table>
-<div className="flex flex-wrap justify-center gap-1.5 mt-4">
-  <button
-    onClick={() => setCurrentTxPage(prev => Math.max(prev - 1, 1))}
-    disabled={currentTxPage === 1}
-    className={`w-10 h-10 border-2 border-black flex items-center justify-center transition-all ${currentTxPage === 1 ? 'bg-surface-variant opacity-50 cursor-not-allowed' : 'bg-white hover:bg-tertiary-fixed'}`}
-  >
-    <span className="material-symbols-outlined">chevron_left</span>
-  </button>
-  {Array.from({ length: totalTxPages }, (_, i) => i + 1).map(page => (
-    <button
-      key={page}
-      onClick={() => setCurrentTxPage(page)}
-      className={`w-10 h-10 border-2 border-black flex items-center justify-center transition-all font-label-bold ${currentTxPage === page ? 'bg-primary text-white neubrutal-shadow' : 'bg-white hover:bg-tertiary-fixed'}`}
-    >
-      {page}
-    </button>
-  ))}
-  <button
-    onClick={() => setCurrentTxPage(prev => Math.min(prev + 1, totalTxPages))}
-    disabled={currentTxPage === totalTxPages}
-    className={`w-10 h-10 border-2 border-black flex items-center justify-center transition-all ${currentTxPage === totalTxPages ? 'bg-surface-variant opacity-50 cursor-not-allowed' : 'bg-white hover:bg-tertiary-fixed'}`}
-  >
-    <span className="material-symbols-outlined">chevron_right</span>
-  </button>
-</div>
               </div>
+
+              {/* Pagination */}
+              {!loading && transaksiData.length > 0 && (
+                <div className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white border-t-4 border-black">
+                  <p className="font-label-bold text-xs uppercase text-center sm:text-left text-zinc-500">
+                    Menampilkan {startIndex}-{endIndex} dari {transaksiData.length} transaksi
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-1.5 md:gap-2">
+                    <button
+                      onClick={() => setCurrentTxPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentTxPage === 1}
+                      className={`w-10 h-10 border-2 border-black flex items-center justify-center transition-all ${currentTxPage === 1 ? 'bg-surface-variant opacity-50 cursor-not-allowed' : 'bg-white hover:bg-tertiary-fixed'}`}
+                    >
+                      <span className="material-symbols-outlined">chevron_left</span>
+                    </button>
+                    {getPageNumbers().map((page, idx) => (
+                      page === '...' ? (
+                        <span 
+                          key={`dots-${idx}`}
+                          className="w-10 h-10 border-2 border-black flex items-center justify-center font-label-bold bg-white text-zinc-400"
+                        >
+                          ...
+                        </span>
+                      ) : (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentTxPage(page)}
+                          className={`w-10 h-10 border-2 border-black flex items-center justify-center transition-all font-label-bold ${currentTxPage === page ? 'bg-primary text-white neubrutal-shadow' : 'bg-white hover:bg-tertiary-fixed'}`}
+                        >
+                          {page}
+                        </button>
+                      )
+                    ))}
+                    <button
+                      onClick={() => setCurrentTxPage(prev => Math.min(prev + 1, totalTxPages))}
+                      disabled={currentTxPage === totalTxPages}
+                      className={`w-10 h-10 border-2 border-black flex items-center justify-center transition-all ${currentTxPage === totalTxPages ? 'bg-surface-variant opacity-50 cursor-not-allowed' : 'bg-white hover:bg-tertiary-fixed'}`}
+                    >
+                      <span className="material-symbols-outlined">chevron_right</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

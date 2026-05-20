@@ -23,7 +23,31 @@ const app = express()
 const PORT = process.env.PORT || 3000
 const prisma = new PrismaClient()
 
-app.use(cors())
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:5173',
+  'http://localhost:3000'
+].filter(Boolean)
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, curl, or postman)
+    if (!origin) return callback(null, true)
+    
+    // Check if origin is explicitly in allowed list or is a Vercel deployment
+    const isAllowed = allowedOrigins.some(allowed => origin.startsWith(allowed)) || 
+                      origin.endsWith('.vercel.app');
+                      
+    if (isAllowed) {
+      return callback(null, true)
+    }
+    
+    return callback(new Error('The CORS policy for this site does not allow access from the specified Origin.'), false)
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}))
 app.use(express.json())
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
 
