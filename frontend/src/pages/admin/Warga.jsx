@@ -188,6 +188,23 @@ export default function AdminWarga() {
   const startIndex = sortedData.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
   const endIndex = Math.min(currentPage * PAGE_SIZE, sortedData.length)
 
+  const getPageNumbers = () => {
+    const pages = []
+    const range = 1
+    for (let i = 1; i <= totalPages; i++) {
+      if (
+        i === 1 ||
+        i === totalPages ||
+        (i >= currentPage - range && i <= currentPage + range)
+      ) {
+        pages.push(i)
+      } else if (pages[pages.length - 1] !== '...') {
+        pages.push('...')
+      }
+    }
+    return pages
+  }
+
   return (
     <AdminLayout>
       <div className="max-w-7xl mx-auto max-w-full">
@@ -648,8 +665,8 @@ export default function AdminWarga() {
           {/* Pagination */}
           {!loading && sortedData.length > 0 && (
             <div className="p-4 md:p-gutter flex flex-col md:flex-row justify-between items-center gap-4 bg-white">
-              <p className="font-label-bold text-xs uppercase">Menampilkan {startIndex}-{endIndex} dari {sortedData.length} warga</p>
-              <div className="flex gap-2">
+              <p className="font-label-bold text-xs uppercase text-center md:text-left">Menampilkan {startIndex}-{endIndex} dari {sortedData.length} warga</p>
+              <div className="flex flex-wrap justify-center gap-1.5 md:gap-2">
                 <button 
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                   disabled={currentPage === 1}
@@ -661,18 +678,27 @@ export default function AdminWarga() {
                 >
                   <span className="material-symbols-outlined">chevron_left</span>
                 </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`w-10 h-10 border-2 border-black flex items-center justify-center transition-all font-label-bold ${
-                      currentPage === page
-                        ? 'bg-primary text-white neubrutal-shadow'
-                        : 'bg-white hover:bg-tertiary-fixed'
-                    }`}
-                  >
-                    {page}
-                  </button>
+                {getPageNumbers().map((page, idx) => (
+                  page === '...' ? (
+                    <span 
+                      key={`dots-${idx}`}
+                      className="w-10 h-10 border-2 border-black flex items-center justify-center font-label-bold bg-white text-zinc-400"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`w-10 h-10 border-2 border-black flex items-center justify-center transition-all font-label-bold ${
+                        currentPage === page
+                          ? 'bg-primary text-white neubrutal-shadow'
+                          : 'bg-white hover:bg-tertiary-fixed'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  )
                 ))}
                 <button 
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
@@ -781,9 +807,12 @@ export default function AdminWarga() {
 
         {/* Contextual Cards */}
         <div className="mb-24 md:mb-0">
-          <button 
+          <div 
+            role="button"
+            tabIndex={0}
             onClick={() => setShowGuideModal(true)}
-            className="w-full bg-white border-4 border-black p-4 md:p-gutter neubrutal-shadow flex items-center gap-4 md:gap-6 text-left hover:bg-zinc-50 transition-colors cursor-pointer"
+            onKeyDown={(e) => e.key === 'Enter' && setShowGuideModal(true)}
+            className="w-full bg-white border-4 border-black p-4 md:p-gutter neubrutal-shadow flex flex-col sm:flex-row items-start sm:items-center gap-4 md:gap-6 text-left hover:bg-zinc-50 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <div className="w-16 h-16 md:w-20 md:h-20 border-4 border-black bg-tertiary-fixed shrink-0 flex items-center justify-center">
               <span className="material-symbols-outlined text-3xl md:text-4xl">info</span>
@@ -794,13 +823,13 @@ export default function AdminWarga() {
                 Klik untuk melihat panduan lengkap pengelolaan data warga.
               </p>
             </div>
-          </button>
+          </div>
         </div>
 
         {/* Modal Panduan Admin */}
         {showGuideModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white border-4 border-black w-full max-w-2xl max-h-[90vh] overflow-y-auto neubrutal-shadow">
+            <div className="bg-white border-4 border-black w-full max-w-2xl max-h-[90vh] neubrutal-shadow flex flex-col">
               <div className="p-4 md:p-6 border-b-4 border-black flex justify-between items-center bg-tertiary-fixed sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl md:text-2xl uppercase flex items-center gap-3">
                   <span className="material-symbols-outlined text-3xl">info</span>
@@ -810,7 +839,7 @@ export default function AdminWarga() {
                   <span className="material-symbols-outlined text-3xl">close</span>
                 </button>
               </div>
-              <div className="p-4 md:p-6 space-y-6">
+              <div className="p-4 md:p-6 space-y-6 flex-1 overflow-y-auto">
                 <div className="space-y-3">
                   <h3 className="font-headline-md uppercase text-primary flex items-center gap-2">
                     <span className="material-symbols-outlined">person_add</span>
@@ -869,6 +898,14 @@ export default function AdminWarga() {
                     <li>Periksa status pembayaran setiap awal bulan</li>
                   </ul>
                 </div>
+              </div>
+              <div className="p-4 border-t-4 border-black bg-zinc-50 flex justify-end">
+                <button 
+                  onClick={() => setShowGuideModal(false)}
+                  className="px-8 py-3 bg-black text-white border-4 border-black font-label-bold uppercase neubrutal-shadow active-press"
+                >
+                  Saya Mengerti
+                </button>
               </div>
             </div>
           </div>

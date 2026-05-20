@@ -46,7 +46,7 @@ export default function AdminDashboard() {
   const totalTerkumpulBulanIni = iuranBulanIni.filter(i => i.status === 'lunas').reduce((sum, i) => sum + Number(i.jumlah), 0)
   const estimasiBulanIni = iuranBulanIni.reduce((sum, i) => sum + Number(i.jumlah), 0)
   const persentase = estimasiBulanIni > 0 ? Math.round((totalTerkumpulBulanIni / estimasiBulanIni) * 100) : 0
-  
+
   const terkumpulWarga = iuranWargaBulanIni.filter(i => i.status === 'lunas').reduce((sum, i) => sum + Number(i.jumlah), 0)
   const terkumpulMakam = iuranMakamBulanIni.filter(i => i.status === 'lunas').reduce((sum, i) => sum + Number(i.jumlah), 0)
   const estimasiWarga = iuranWargaBulanIni.reduce((sum, i) => sum + Number(i.jumlah), 0)
@@ -83,7 +83,7 @@ export default function AdminDashboard() {
           <div>
             <h1 className="font-display-bold text-headline-md md:text-display-bold uppercase">Dashboard Admin</h1>
             <p className="font-body-lg text-zinc-600 mt-2">
-              Ringkasan administrasi RT 04 Neighborhood.
+              Ringkasan administrasi RT 03.
             </p>
           </div>
           <div className="text-right hidden md:block">

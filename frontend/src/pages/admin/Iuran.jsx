@@ -26,6 +26,8 @@ export default function AdminIuran() {
   const [showGuideModal, setShowGuideModal] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [tipeFilter, setTipeFilter] = useState('SEMUA')
+const [currentTxPage, setCurrentTxPage] = useState(1);
+const PAGE_TX_SIZE = 10;
   const [showGenerateModal, setShowGenerateModal] = useState(false)
   const [generateData, setGenerateData] = useState({ tipe: 'warga', bulan: new Date().getMonth() + 1, tahun: new Date().getFullYear() })
   const [wargaSearch, setWargaSearch] = useState('')
@@ -258,7 +260,13 @@ export default function AdminIuran() {
 
   const totalEstimasi = dataIuran.reduce((sum, item) => sum + Number(item.jumlah), 0)
   const totalTerbayar = dataIuran.filter(i => i.status === 'lunas').reduce((sum, item) => sum + Number(item.jumlah), 0)
-  const totalBelum = totalEstimasi - totalTerbayar
+  const totalBelum = totalEstimasi - totalTerbayar;
+const totalTxPages = Math.ceil(transaksiData.length / PAGE_TX_SIZE) || 1;
+const paginatedTransaksi = transaksiData.slice((currentTxPage - 1) * PAGE_TX_SIZE, currentTxPage * PAGE_TX_SIZE);
+
+useEffect(() => {
+  setCurrentTxPage(1);
+}, [transaksiData]);
 
   return (
     <AdminLayout>
@@ -490,7 +498,7 @@ export default function AdminIuran() {
                         <td colSpan="6" className="p-4 text-center font-bold text-xs uppercase">Memuat...</td>
                       </tr>
                     ) : (
-                      transaksiData.map((row) => (
+                      paginatedTransaksi.map((row) => (
                         <tr key={row.id} className="border-b-2 border-black hover:bg-yellow-50">
                           <td className="p-4 font-bold text-sm">{row.warga?.user?.nama}</td>
                           <td className="p-4">
@@ -543,6 +551,31 @@ export default function AdminIuran() {
                     )}
                   </tbody>
                 </table>
+<div className="flex flex-wrap justify-center gap-1.5 mt-4">
+  <button
+    onClick={() => setCurrentTxPage(prev => Math.max(prev - 1, 1))}
+    disabled={currentTxPage === 1}
+    className={`w-10 h-10 border-2 border-black flex items-center justify-center transition-all ${currentTxPage === 1 ? 'bg-surface-variant opacity-50 cursor-not-allowed' : 'bg-white hover:bg-tertiary-fixed'}`}
+  >
+    <span className="material-symbols-outlined">chevron_left</span>
+  </button>
+  {Array.from({ length: totalTxPages }, (_, i) => i + 1).map(page => (
+    <button
+      key={page}
+      onClick={() => setCurrentTxPage(page)}
+      className={`w-10 h-10 border-2 border-black flex items-center justify-center transition-all font-label-bold ${currentTxPage === page ? 'bg-primary text-white neubrutal-shadow' : 'bg-white hover:bg-tertiary-fixed'}`}
+    >
+      {page}
+    </button>
+  ))}
+  <button
+    onClick={() => setCurrentTxPage(prev => Math.min(prev + 1, totalTxPages))}
+    disabled={currentTxPage === totalTxPages}
+    className={`w-10 h-10 border-2 border-black flex items-center justify-center transition-all ${currentTxPage === totalTxPages ? 'bg-surface-variant opacity-50 cursor-not-allowed' : 'bg-white hover:bg-tertiary-fixed'}`}
+  >
+    <span className="material-symbols-outlined">chevron_right</span>
+  </button>
+</div>
               </div>
             </div>
           </div>
