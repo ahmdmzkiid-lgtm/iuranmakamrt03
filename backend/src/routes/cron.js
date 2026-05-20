@@ -35,19 +35,10 @@ const handleCleanup = async (req, res) => {
       makam: dMakam.count
     })
 
-    res.json({
-      message: 'Database cleanup executed successfully',
-      deleted: {
-        iuran: dIuran.count,
-        warga: dWarga.count,
-        notifications: dNotification.count,
-        wargaUsers: dUser.count,
-        makam: dMakam.count
-      }
-    })
+    res.status(200).send('OK')
   } catch (error) {
     console.error('Error during database cleanup via cron:', error)
-    res.status(500).json({ message: 'Internal Server Error', error: error.message })
+    res.status(500).send('Internal Server Error')
   }
 }
 

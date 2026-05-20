@@ -67,7 +67,12 @@ export default function AdminIuran() {
   const fetchWarga = async () => {
     try {
       const res = await api.get('/warga')
-      setWargaList(res.data)
+      const sortedWarga = [...res.data].sort((a, b) => {
+        const nameA = a.user?.nama || ''
+        const nameB = b.user?.nama || ''
+        return nameA.localeCompare(nameB, 'id', { sensitivity: 'base' })
+      })
+      setWargaList(sortedWarga)
     } catch (error) {
       console.error('Failed to fetch warga', error)
     }

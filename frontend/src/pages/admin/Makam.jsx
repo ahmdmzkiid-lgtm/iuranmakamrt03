@@ -102,6 +102,11 @@ export default function AdminMakam() {
                              warga.user?.nomorKK?.toLowerCase().includes(query) ||
                              warga.alamat?.toLowerCase().includes(query)
                     })
+                    .sort((a, b) => {
+                      const nameA = a.user?.nama || ''
+                      const nameB = b.user?.nama || ''
+                      return nameA.localeCompare(nameB, 'id', { sensitivity: 'base' })
+                    })
                     .map((warga) => (
                     <tr key={warga.id} className="border-b-2 border-zinc-200 hover:bg-zinc-50 transition-colors align-top">
                       <td className="p-4">

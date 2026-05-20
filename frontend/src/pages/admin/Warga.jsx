@@ -7,6 +7,8 @@ import * as XLSX from 'xlsx'
 
 export default function AdminWarga() {
   const [wargaData, setWargaData] = useState([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const PAGE_SIZE = 10
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('SEMUA STATUS')
@@ -60,6 +62,10 @@ export default function AdminWarga() {
   useEffect(() => {
     fetchWarga()
   }, [])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, statusFilter])
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -170,6 +176,17 @@ export default function AdminWarga() {
     
     return matchesSearch && matchesStatus
   })
+
+  const sortedData = [...filteredData].sort((a, b) => {
+    const nameA = a.user?.nama || ''
+    const nameB = b.user?.nama || ''
+    return nameA.localeCompare(nameB, 'id', { sensitivity: 'base' })
+  })
+
+  const totalPages = Math.ceil(sortedData.length / PAGE_SIZE) || 1
+  const paginatedData = sortedData.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const startIndex = sortedData.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
+  const endIndex = Math.min(currentPage * PAGE_SIZE, sortedData.length)
 
   return (
     <AdminLayout>
@@ -570,12 +587,12 @@ export default function AdminWarga() {
                   <tr>
                     <td colSpan="5" className="p-4 md:p-gutter text-center font-label-bold uppercase">Memuat data...</td>
                   </tr>
-                ) : filteredData.length === 0 ? (
+                ) : sortedData.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="p-4 md:p-gutter text-center font-label-bold uppercase text-zinc-500">Tidak ada data warga.</td>
                   </tr>
                 ) : (
-                  filteredData.map((row, idx) => (
+                  paginatedData.map((row, idx) => (
                     <tr
                       key={row.id}
                       className={`border-b-4 border-black hover:bg-surface-container-low transition-colors ${
@@ -629,15 +646,43 @@ export default function AdminWarga() {
           </div>
 
           {/* Pagination */}
-          {!loading && filteredData.length > 0 && (
+          {!loading && sortedData.length > 0 && (
             <div className="p-4 md:p-gutter flex flex-col md:flex-row justify-between items-center gap-4 bg-white">
-              <p className="font-label-bold text-xs uppercase">Menampilkan 1-{filteredData.length} dari {wargaData.length} warga</p>
+              <p className="font-label-bold text-xs uppercase">Menampilkan {startIndex}-{endIndex} dari {sortedData.length} warga</p>
               <div className="flex gap-2">
-                <button className="w-10 h-10 border-2 border-black flex items-center justify-center bg-surface-variant opacity-50 cursor-not-allowed">
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className={`w-10 h-10 border-2 border-black flex items-center justify-center transition-all ${
+                    currentPage === 1 
+                      ? 'bg-surface-variant opacity-50 cursor-not-allowed' 
+                      : 'bg-white hover:bg-tertiary-fixed'
+                  }`}
+                >
                   <span className="material-symbols-outlined">chevron_left</span>
                 </button>
-                <button className="w-10 h-10 border-2 border-black flex items-center justify-center bg-primary text-white neubrutal-shadow">1</button>
-                <button className="w-10 h-10 border-2 border-black flex items-center justify-center bg-surface-variant opacity-50 cursor-not-allowed">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`w-10 h-10 border-2 border-black flex items-center justify-center transition-all font-label-bold ${
+                      currentPage === page
+                        ? 'bg-primary text-white neubrutal-shadow'
+                        : 'bg-white hover:bg-tertiary-fixed'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className={`w-10 h-10 border-2 border-black flex items-center justify-center transition-all ${
+                    currentPage === totalPages 
+                      ? 'bg-surface-variant opacity-50 cursor-not-allowed' 
+                      : 'bg-white hover:bg-tertiary-fixed'
+                  }`}
+                >
                   <span className="material-symbols-outlined">chevron_right</span>
                 </button>
               </div>

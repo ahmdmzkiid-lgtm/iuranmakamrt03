@@ -1,0 +1,4 @@
+Setiap kali membuat atau memodifikasi route API untuk cronjob, 
+pastikan selalu respon HTTP akhirnya selalu berupa teks minimalis seperti res.send("OK") 
+dan JANGAN PERNAH mengembalikan payload data JSON yang besar untuk menghindari
+error payload limit/output terlalu besar pada pihak ketiga.
