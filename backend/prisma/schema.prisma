@@ -11,6 +11,7 @@ model User {
   id        Int      @id @default(autoincrement())
   email     String?  @unique
   nomorKK   String?  @unique
+  nik       String?
   password  String
   nama      String
   role      String   // admin | warga
@@ -29,7 +30,7 @@ model Warga {
   telepon       String?
   jumlahMakam   Int      @default(1)
   bulanTerbayar Int      @default(0)
-  daftarAlmarhum Json?
+  anggotaKeluarga Json?
   isFirstLogin   Boolean  @default(true)
   iuran         Iuran[]
   createdAt     DateTime @default(now())
@@ -47,6 +48,7 @@ model Iuran {
   id        Int      @id @default(autoincrement())
   wargaId   Int
   warga     Warga    @relation(fields: [wargaId], references: [id])
+  tipe      String   @default("makam") // warga | makam
   tahun     Int
   bulan     Int
   jumlah    Decimal  @db.Decimal(10, 2)

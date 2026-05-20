@@ -32,7 +32,14 @@ export default function Login() {
       localStorage.setItem('role', res.data.role)
       localStorage.setItem('nama', res.data.nama)
       localStorage.setItem('identifier', nomorKK)
-      window.location.href = res.data.role === 'admin' ? '/admin' : '/warga'
+      
+      // Check if first login - redirect to change password
+      if (res.data.isFirstLogin) {
+        localStorage.setItem('isFirstLogin', 'true')
+        window.location.href = '/warga/ubah-password'
+      } else {
+        window.location.href = res.data.role === 'admin' ? '/admin' : '/warga'
+      }
     } catch (err) {
       console.error(err)
       showAlert(err.response?.data?.message || 'Nomor KK atau Password salah')
@@ -140,8 +147,6 @@ export default function Login() {
                 type="button"
                 onClick={() => {
                   setActiveMode('admin')
-                  setNomorKK('')
-                  setPassword('')
                 }}
               >
                 LOGIN ADMIN
@@ -155,8 +160,6 @@ export default function Login() {
                 type="button"
                 onClick={() => {
                   setActiveMode('warga')
-                  setNomorKK('')
-                  setPassword('')
                 }}
               >
                 LOGIN WARGA

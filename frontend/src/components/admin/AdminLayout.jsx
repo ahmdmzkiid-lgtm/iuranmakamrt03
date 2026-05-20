@@ -2,24 +2,24 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 const navItems = [
   { label: 'Dashboard', path: '/admin', icon: 'dashboard' },
-  { label: 'Residents', path: '/admin/warga', icon: 'groups' },
-  { label: 'Makam', path: '/admin/makam', icon: 'church' },
-  { label: 'Fees', path: '/admin/iuran', icon: 'payments' },
-  { label: 'Settings', path: '/admin/setelan', icon: 'settings' },
+  { label: 'Data Warga', path: '/admin/warga', icon: 'groups' },
+  { label: 'Iuran', path: '/admin/iuran', icon: 'payments' },
+  { label: 'Kelola Iuran', path: '/admin/makam', icon: 'tune' },
+  { label: 'Setting', path: '/admin/setelan', icon: 'settings' },
 ]
 
 const topNavItems = [
   { label: 'Dashboard', path: '/admin' },
-  { label: 'Residents', path: '/admin/warga' },
-  { label: 'Makam', path: '/admin/makam' },
-  { label: 'Fees', path: '/admin/iuran' },
+  { label: 'Data Warga', path: '/admin/warga' },
+  { label: 'Iuran', path: '/admin/iuran' },
+  { label: 'Kelola Iuran', path: '/admin/makam' },
 ]
 
 const mobileNavItems = [
   { label: 'Dash', path: '/admin', icon: 'dashboard' },
-  { label: 'Resident', path: '/admin/warga', icon: 'groups' },
-  { label: 'Makam', path: '/admin/makam', icon: 'church' },
-  { label: 'Fees', path: '/admin/iuran', icon: 'payments' },
+  { label: 'Warga', path: '/admin/warga', icon: 'groups' },
+  { label: 'Iuran', path: '/admin/iuran', icon: 'payments' },
+  { label: 'Kelola', path: '/admin/makam', icon: 'tune' },
 ]
 
 export default function AdminLayout({ children, activeLabel = 'Dashboard' }) {
@@ -41,7 +41,7 @@ export default function AdminLayout({ children, activeLabel = 'Dashboard' }) {
         <div className="flex items-center gap-2 md:gap-4 min-w-0">
           <div className="bg-black text-white px-3 py-1 border-2 border-black rotate-[-1deg] neubrutal-shadow-sm">
             <h1 className="font-['Inter'] font-black uppercase tracking-tight text-sm md:text-base leading-tight">
-              IURAN MAKAM <span className="text-primary-fixed">RT 03</span>
+              IURAN <span className="text-primary-fixed">RT 03</span>
             </h1>
           </div>
         </div>
@@ -112,10 +112,10 @@ export default function AdminLayout({ children, activeLabel = 'Dashboard' }) {
           
           <footer className="mt-12 md:mt-24 pb-8 border-t-4 border-black pt-8 flex flex-col items-center gap-2 text-center">
             <p className="font-label-bold uppercase text-[10px] md:text-xs">
-              © 2026 Iuran Makam RT 03 - Limo. DIBUAT OLEH <a href="https://ahmdmzki.web.id" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary transition-colors">ahmdmzki.web.id</a>
+              © 2026 Iuran RT 03 - Limo. DIBUAT OLEH <a href="https://ahmdmzki.web.id" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary transition-colors">ahmdmzki.web.id</a>
             </p>
             <p className="text-[9px] uppercase font-bold text-zinc-400">
-              Sistem Informasi Pengelolaan Iuran Lingkungan
+              Sistem Informasi Pengelolaan Iuran RT
             </p>
           </footer>
         </main>

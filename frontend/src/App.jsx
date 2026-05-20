@@ -12,6 +12,7 @@ import WargaKuitansi from './pages/warga/Kuitansi'
 import WargaSetelan from './pages/warga/Setelan'
 import WargaMakam from './pages/warga/Makam'
 import WargaRiwayat from './pages/warga/Riwayat'
+import WargaUbahPassword from './pages/warga/UbahPassword'
 import AdminSetelan from './pages/admin/Setelan'
 
 function App() {
@@ -31,6 +32,7 @@ function App() {
         <Route path="/warga/makam" element={<WargaMakam />} />
         <Route path="/warga/kuitansi" element={<WargaKuitansi />} />
         <Route path="/warga/setelan" element={<WargaSetelan />} />
+        <Route path="/warga/ubah-password" element={<WargaUbahPassword />} />
       </Routes>
     </NotificationProvider>
   )

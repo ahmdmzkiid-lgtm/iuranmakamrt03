@@ -13,9 +13,9 @@ export default function WargaSetelan() {
     nomorKK: '',
     noRumah: '',
     telepon: '',
-    jumlahMakam: 1,
-    almarhum: [],
+    anggotaKeluarga: [],
   })
+  const [newAnggota, setNewAnggota] = useState({ nama: '', nik: '' })
 
   useEffect(() => {
     const fetchProfil = async () => {
@@ -27,8 +27,7 @@ export default function WargaSetelan() {
           nomorKK: data.user?.nomorKK || '',
           noRumah: data.alamat || '',
           telepon: data.telepon || '',
-          jumlahMakam: data.jumlahMakam || 1,
-          almarhum: data.daftarAlmarhum || [],
+          anggotaKeluarga: data.anggotaKeluarga || [],
         })
       } catch (error) {
         console.error('Failed to fetch profile', error)
@@ -45,30 +44,6 @@ export default function WargaSetelan() {
     setForm((prev) => ({ ...prev, [field]: value }))
   }
 
-  const handleAlmarhumChange = (index, field, value) => {
-    setForm((prev) => {
-      const updated = [...prev.almarhum]
-      updated[index] = { ...updated[index], [field]: value }
-      return { ...prev, almarhum: updated }
-    })
-  }
-
-  const addAlmarhum = () => {
-    setForm((prev) => ({
-      ...prev,
-      almarhum: [...prev.almarhum, { nama: '', hubungan: '', tahunWafat: '' }],
-      jumlahMakam: prev.jumlahMakam + 1,
-    }))
-  }
-
-  const removeAlmarhum = (index) => {
-    setForm((prev) => ({
-      ...prev,
-      almarhum: prev.almarhum.filter((_, i) => i !== index),
-      jumlahMakam: Math.max(0, prev.jumlahMakam - 1),
-    }))
-  }
-
   const handleSave = async () => {
     setIsSaving(true)
     try {
@@ -76,8 +51,7 @@ export default function WargaSetelan() {
         nama: form.namaLengkap,
         alamat: form.noRumah,
         telepon: form.telepon,
-        jumlahMakam: form.jumlahMakam,
-        daftarAlmarhum: form.almarhum
+        anggotaKeluarga: form.anggotaKeluarga
       })
       localStorage.setItem('nama', form.namaLengkap)
       setIsEditing(false)
@@ -223,145 +197,115 @@ export default function WargaSetelan() {
           </div>
         </div>
 
-        {/* Informasi Makam Section */}
+        {/* Anggota Keluarga Section */}
         <div className="bg-white border-4 border-black neubrutal-shadow-lg mb-6">
           <div className="border-b-4 border-black p-4 md:p-md bg-zinc-100 flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-2xl">church</span>
-              <h2 className="font-headline-md uppercase text-base md:text-headline-md">Informasi Makam</h2>
+              <span className="material-symbols-outlined text-2xl">group</span>
+              <h2 className="font-headline-md uppercase text-base md:text-headline-md">Anggota Keluarga</h2>
             </div>
             <div className="bg-primary text-white border-2 border-black px-4 py-2 font-label-bold uppercase text-xs">
-              {form.jumlahMakam} Makam
+              {form.anggotaKeluarga.length} Orang
             </div>
           </div>
 
           <div className="p-4 md:p-md">
-            {/* Jumlah Makam */}
-            <div className="mb-6">
-              <label className="font-label-bold text-xs uppercase text-zinc-500 mb-1 block">
-                Jumlah Makam
-              </label>
-              {isEditing ? (
-                <input
-                  type="number"
-                  min="0"
-                  value={form.jumlahMakam}
-                  onChange={(e) => handleChange('jumlahMakam', parseInt(e.target.value) || 0)}
-                  className="w-32 border-3 border-black p-3 font-body-lg bg-tertiary-fixed/20 focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition-all text-center"
-                  style={{ borderWidth: '3px' }}
-                />
+            {/* Daftar Anggota */}
+            <div className="space-y-2 mb-4">
+              {form.anggotaKeluarga.length === 0 ? (
+                <p className="text-zinc-500 text-sm italic">Belum ada anggota keluarga</p>
               ) : (
-                <p className="font-body-lg p-3 bg-zinc-50 border-2 border-zinc-200 w-32 text-center">
-                  {form.jumlahMakam}
-                </p>
+                form.anggotaKeluarga.map((anggota, idx) => {
+                  const nama = typeof anggota === 'string' ? anggota : anggota.nama
+                  const nik = typeof anggota === 'object' ? anggota.nik : ''
+                  return (
+                    <div key={idx} className="bg-zinc-50 border-2 border-zinc-200 p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          {isEditing ? (
+                            <div className="space-y-2">
+                              <input
+                                type="text"
+                                value={nama}
+                                onChange={(e) => {
+                                  const updated = [...form.anggotaKeluarga]
+                                  updated[idx] = { nama: e.target.value, nik }
+                                  handleChange('anggotaKeluarga', updated)
+                                }}
+                                placeholder="Nama"
+                                className="w-full border-2 border-black p-2 font-body-lg bg-white focus:outline-none"
+                              />
+                              <input
+                                type="text"
+                                value={nik}
+                                onChange={(e) => {
+                                  const updated = [...form.anggotaKeluarga]
+                                  updated[idx] = { nama, nik: e.target.value }
+                                  handleChange('anggotaKeluarga', updated)
+                                }}
+                                placeholder="NIK"
+                                className="w-full border-2 border-black p-2 text-sm bg-white focus:outline-none"
+                              />
+                            </div>
+                          ) : (
+                            <>
+                              <p className="font-body-lg">{nama}</p>
+                              <p className="text-xs text-zinc-500">NIK: {nik || '-'}</p>
+                            </>
+                          )}
+                        </div>
+                        {isEditing && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = form.anggotaKeluarga.filter((_, i) => i !== idx)
+                              handleChange('anggotaKeluarga', updated)
+                            }}
+                            className="text-error hover:bg-error/10 p-1 rounded ml-2"
+                          >
+                            <span className="material-symbols-outlined text-xl">delete</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })
               )}
             </div>
 
-            {/* Daftar Almarhum/Almarhumah */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <label className="font-label-bold text-xs uppercase text-zinc-500">
-                  Daftar Almarhum / Almarhumah
-                </label>
-                {isEditing && (
-                  <button
-                    onClick={addAlmarhum}
-                    className="bg-tertiary-fixed text-black border-2 border-black px-3 py-1.5 font-label-bold uppercase text-xs neubrutal-shadow active:translate-y-1 active:shadow-none transition-all flex items-center gap-1"
-                  >
-                    <span className="material-symbols-outlined text-base">add</span>
-                    Tambah
-                  </button>
-                )}
+            {/* Tambah Anggota */}
+            {isEditing && (
+              <div className="space-y-2 border-2 border-dashed border-zinc-300 p-3">
+                <p className="text-xs font-bold uppercase text-zinc-500">Tambah Anggota Baru</p>
+                <input
+                  type="text"
+                  placeholder="Nama anggota keluarga"
+                  value={newAnggota.nama}
+                  onChange={(e) => setNewAnggota({ ...newAnggota, nama: e.target.value })}
+                  className="w-full border-2 border-black p-2 font-body-lg bg-white focus:outline-none"
+                />
+                <input
+                  type="text"
+                  placeholder="NIK (opsional)"
+                  value={newAnggota.nik}
+                  onChange={(e) => setNewAnggota({ ...newAnggota, nik: e.target.value })}
+                  className="w-full border-2 border-black p-2 text-sm bg-white focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (newAnggota.nama.trim()) {
+                      handleChange('anggotaKeluarga', [...form.anggotaKeluarga, { nama: newAnggota.nama.trim(), nik: newAnggota.nik.trim() }])
+                      setNewAnggota({ nama: '', nik: '' })
+                    }
+                  }}
+                  className="w-full bg-primary text-white border-2 border-black p-2 font-label-bold uppercase flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined">add</span>
+                  Tambah Anggota
+                </button>
               </div>
-
-              <div className="space-y-4">
-                {form.almarhum.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="border-3 border-black p-4 bg-surface-container-low relative"
-                    style={{ borderWidth: '3px' }}
-                  >
-                    {isEditing && (
-                      <button
-                        onClick={() => removeAlmarhum(idx)}
-                        className="absolute top-2 right-2 bg-error text-white border-2 border-black w-8 h-8 flex items-center justify-center hover:scale-110 active:scale-95 transition-all"
-                      >
-                        <span className="material-symbols-outlined text-base">close</span>
-                      </button>
-                    )}
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="bg-black text-white w-7 h-7 flex items-center justify-center font-label-bold text-xs">
-                        {idx + 1}
-                      </span>
-                      <span className="font-label-bold uppercase text-xs text-zinc-500">
-                        Data Almarhum/ah #{idx + 1}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div className="md:col-span-1">
-                        <label className="text-[10px] uppercase font-label-bold text-zinc-400 mb-1 block">
-                          Nama
-                        </label>
-                        {isEditing ? (
-                          <input
-                            type="text"
-                            value={item.nama}
-                            onChange={(e) => handleAlmarhumChange(idx, 'nama', e.target.value)}
-                            placeholder="Nama almarhum/ah"
-                            className="w-full border-2 border-black p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary"
-                          />
-                        ) : (
-                          <p className="text-sm font-body-lg">{item.nama || '-'}</p>
-                        )}
-                      </div>
-                      <div>
-                        <label className="text-[10px] uppercase font-label-bold text-zinc-400 mb-1 block">
-                          Hubungan
-                        </label>
-                        {isEditing ? (
-                          <input
-                            type="text"
-                            value={item.hubungan}
-                            onChange={(e) => handleAlmarhumChange(idx, 'hubungan', e.target.value)}
-                            placeholder="Contoh: Ayah, Ibu"
-                            className="w-full border-2 border-black p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary"
-                          />
-                        ) : (
-                          <p className="text-sm font-body-lg">{item.hubungan || '-'}</p>
-                        )}
-                      </div>
-                      <div>
-                        <label className="text-[10px] uppercase font-label-bold text-zinc-400 mb-1 block">
-                          Tahun Wafat
-                        </label>
-                        {isEditing ? (
-                          <input
-                            type="text"
-                            value={item.tahunWafat}
-                            onChange={(e) => handleAlmarhumChange(idx, 'tahunWafat', e.target.value)}
-                            placeholder="2024"
-                            className="w-full border-2 border-black p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary"
-                          />
-                        ) : (
-                          <p className="text-sm font-body-lg">{item.tahunWafat || '-'}</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                {form.almarhum.length === 0 && (
-                  <div className="border-2 border-dashed border-zinc-300 p-8 text-center">
-                    <span className="material-symbols-outlined text-4xl text-zinc-300 mb-2 block">
-                      sentiment_neutral
-                    </span>
-                    <p className="text-zinc-400 font-label-bold uppercase text-xs">
-                      Belum ada data almarhum
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -392,6 +336,28 @@ export default function WargaSetelan() {
               <span className="material-symbols-outlined">close</span>
               Batal
             </button>
+          </div>
+        )}
+
+        {/* Keamanan Section */}
+        {!isEditing && (
+          <div className="bg-white border-4 border-black neubrutal-shadow-lg mb-6">
+            <div className="border-b-4 border-black p-4 md:p-md bg-zinc-100 flex items-center gap-3">
+              <span className="material-symbols-outlined text-2xl">security</span>
+              <h2 className="font-headline-md uppercase text-base md:text-headline-md">Keamanan</h2>
+            </div>
+            <div className="p-4 md:p-md">
+              <button
+                onClick={() => navigate('/warga/ubah-password')}
+                className="w-full bg-white border-2 border-black p-4 font-label-bold uppercase text-sm flex items-center justify-between hover:bg-zinc-50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="material-symbols-outlined">lock</span>
+                  <span>Ubah Password</span>
+                </div>
+                <span className="material-symbols-outlined">chevron_right</span>
+              </button>
+            </div>
           </div>
         )}
 

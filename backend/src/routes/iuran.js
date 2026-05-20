@@ -10,6 +10,7 @@ const prisma = new PrismaClient()
 // Multer configuration using Cloudinary
 const upload = multer({ storage: storage })
 
+
 // Ambil semua Iuran (Warga: miliknya, Admin: semua)
 router.get('/', verifyToken, async (req, res) => {
   try {
@@ -23,9 +24,14 @@ router.get('/', verifyToken, async (req, res) => {
     } else {
       const iuran = await prisma.iuran.findMany({
         include: { warga: { include: { user: true } } },
-        orderBy: [{ createdAt: 'desc' }],
+        orderBy: [{ tanggalBayar: 'desc' }, { tahun: 'desc' }, { bulan: 'desc' }],
       })
-      return res.json(iuran)
+      // Sort: lunas first, then pending, then belum_bayar
+      const statusOrder = { 'lunas': 0, 'pending': 1, 'belum_bayar': 2 }
+      const sorted = iuran.sort((a, b) => {
+        return statusOrder[a.status] - statusOrder[b.status]
+      })
+      return res.json(sorted)
     }
   } catch (error) {
     console.error('Error GET iuran:', error)
@@ -34,16 +40,38 @@ router.get('/', verifyToken, async (req, res) => {
 })
 
 // Warga bayar (ubah status -> pending)
-router.post('/bayar', verifyToken, upload.single('buktiBayar'), async (req, res) => {
+router.post('/bayar', verifyToken, (req, res, next) => {
+  upload.single('buktiBayar')(req, res, (err) => {
+    if (err) {
+      console.error('Upload error:', err)
+      return res.status(500).json({ message: 'Gagal upload bukti: ' + err.message })
+    }
+    next()
+  })
+}, async (req, res) => {
+  console.log('=== POST /bayar called ===')
+  console.log('Body:', req.body)
+  console.log('File:', req.file)
+  console.log('User:', req.user)
   try {
     const { iuranIds, metode } = req.body
     const buktiBayar = req.file ? req.file.path : null
     
-    const ids = JSON.parse(iuranIds)
+    let ids
+    try {
+      ids = typeof iuranIds === 'string' ? JSON.parse(iuranIds) : iuranIds
+    } catch (e) {
+      console.log('Parse error:', e)
+      return res.status(400).json({ message: 'Format iuranIds tidak valid' })
+    }
 
-    if (!ids || ids.length === 0) {
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ message: 'Pilih minimal 1 tagihan' })
     }
+
+    // Convert string ids to integers
+    const intIds = ids.map(id => parseInt(id))
+    console.log('Bayar iuran ids:', intIds, 'metode:', metode)
 
     if (metode !== 'Bayar Tunai' && !buktiBayar) {
       return res.status(400).json({ message: 'Bukti pembayaran wajib diunggah untuk transfer' })
@@ -54,7 +82,7 @@ router.post('/bayar', verifyToken, upload.single('buktiBayar'), async (req, res)
 
     await prisma.iuran.updateMany({
       where: {
-        id: { in: ids },
+        id: { in: intIds },
         wargaId: warga.id,
       },
       data: {
@@ -67,8 +95,8 @@ router.post('/bayar', verifyToken, upload.single('buktiBayar'), async (req, res)
     
     res.json({ message: 'Pembayaran berhasil dikirim dan menunggu verifikasi.' })
   } catch (error) {
-    console.error('Error POST bayar:', error)
-    res.status(500).json({ message: 'Internal server error' })
+    console.error('Error POST bayar:', error.message, error.stack)
+    res.status(500).json({ message: error.message || 'Internal server error' })
   }
 })
 
@@ -174,8 +202,9 @@ router.put('/:id/offline', verifyToken, async (req, res) => {
 // Warga bayar di awal (bayar bulan ke depan)
 router.post('/bayar-awal', verifyToken, upload.single('buktiBayar'), async (req, res) => {
   try {
-    const { jumlahBulan, metode } = req.body
+    const { jumlahBulan, metode, tipe, jumlah } = req.body
     const buktiBayar = req.file ? req.file.path : null
+    const iuranTipe = tipe || 'makam'
 
     if (metode !== 'Bayar Tunai' && !buktiBayar) {
       return res.status(400).json({ message: 'Bukti pembayaran wajib diunggah untuk transfer' })
@@ -185,11 +214,12 @@ router.post('/bayar-awal', verifyToken, upload.single('buktiBayar'), async (req,
     if (!warga) return res.status(404).json({ message: 'Warga not found' })
 
     const jBulan = parseInt(jumlahBulan) || 1
-    const jumlahTagihan = 10000 * (warga.jumlahMakam || 1)
+    const jumlahTagihan = parseInt(jumlah) || 0
+    if (jumlahTagihan <= 0) return res.status(400).json({ message: 'Nominal iuran wajib diisi' })
 
-    // Cari iuran terakhir untuk menentukan tahun & bulan selanjutnya
+    // Cari iuran terakhir untuk tipe ini
     const lastIuran = await prisma.iuran.findFirst({
-      where: { wargaId: warga.id },
+      where: { wargaId: warga.id, tipe: iuranTipe },
       orderBy: [{ tahun: 'desc' }, { bulan: 'desc' }]
     })
 
@@ -215,6 +245,7 @@ router.post('/bayar-awal', verifyToken, upload.single('buktiBayar'), async (req,
       }
       newIurans.push({
         wargaId: warga.id,
+        tipe: iuranTipe,
         tahun: t,
         bulan: b,
         jumlah: jumlahTagihan,
@@ -234,28 +265,94 @@ router.post('/bayar-awal', verifyToken, upload.single('buktiBayar'), async (req,
   }
 })
 
+// Admin tambah iuran individual
+router.post('/tambah', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' })
+
+    const { wargaId, tipe, tahun, bulan, jumlah } = req.body
+    const wId = parseInt(wargaId)
+    const bln = parseInt(bulan)
+    const thn = parseInt(tahun)
+
+    if (!wId || !tipe || !bln || !thn) {
+      return res.status(400).json({ message: 'Warga, tipe, bulan, dan tahun wajib diisi' })
+    }
+
+    if (!['warga', 'makam'].includes(tipe)) {
+      return res.status(400).json({ message: 'Tipe harus "warga" atau "makam"' })
+    }
+
+    const warga = await prisma.warga.findUnique({ where: { id: wId } })
+    if (!warga) return res.status(404).json({ message: 'Warga tidak ditemukan' })
+
+    // Check duplicate
+    const exists = await prisma.iuran.findFirst({
+      where: { wargaId: wId, tipe, tahun: thn, bulan: bln }
+    })
+    if (exists) {
+      return res.status(400).json({ message: `Tagihan ${tipe} untuk bulan ${bln}/${thn} sudah ada` })
+    }
+
+    if (!jumlah || parseInt(jumlah) <= 0) {
+      return res.status(400).json({ message: 'Nominal iuran wajib diisi' })
+    }
+
+    const iuran = await prisma.iuran.create({
+      data: {
+        wargaId: wId,
+        tipe,
+        tahun: thn,
+        bulan: bln,
+        jumlah: parseInt(jumlah),
+        status: 'belum_bayar'
+      },
+      include: { warga: { include: { user: true } } }
+    })
+
+    res.json({ message: `Tagihan ${tipe === 'warga' ? 'Iuran Bulanan' : 'Iuran Makam'} berhasil ditambah`, iuran })
+  } catch (error) {
+    console.error('Error POST tambah iuran:', error)
+    res.status(500).json({ message: 'Gagal menambah tagihan' })
+  }
+})
+
 // Admin generate iuran massal (untuk bulan berjalan)
+// Iuran warga: 10.000/KK (tetap)
+// Iuran makam: 10.000 x (1 kepala keluarga + jumlah anggota)
 router.post('/generate', verifyToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' })
     
-    const { tahun, bulan } = req.body // Misal: 2023, 11
-    if (!tahun || !bulan) return res.status(400).json({ message: 'Tahun dan bulan diperlukan' })
+    const { tahun, bulan, tipe } = req.body
+    if (!tahun || !bulan || !tipe) return res.status(400).json({ message: 'Tahun, bulan, dan tipe diperlukan' })
+    if (!['warga', 'makam'].includes(tipe)) return res.status(400).json({ message: 'Tipe harus "warga" atau "makam"' })
 
     const semuaWarga = await prisma.warga.findMany()
+    const IURAN_PER_UNIT = 10000
     
     let created = 0
     for (const w of semuaWarga) {
       const exists = await prisma.iuran.findFirst({
-        where: { wargaId: w.id, tahun, bulan }
+        where: { wargaId: w.id, tahun, bulan, tipe }
       })
       if (!exists) {
+        // Hitung nominal berdasarkan tipe
+        let nominal = IURAN_PER_UNIT // default untuk iuran warga (10rb/KK)
+        if (tipe === 'makam') {
+          // Iuran makam: 10rb x (1 kepala keluarga + jumlah anggota)
+          const jumlahAnggota = Array.isArray(w.anggotaKeluarga) ? w.anggotaKeluarga.length : 0
+          const totalOrang = 1 + jumlahAnggota
+          nominal = IURAN_PER_UNIT * totalOrang
+        }
+
         await prisma.iuran.create({
           data: {
             wargaId: w.id,
+            tipe,
             tahun,
             bulan,
-            jumlah: 10000 * (w.jumlahMakam || 1),
+            jumlah: nominal,
             status: 'belum_bayar',
           }
         })
@@ -275,19 +372,21 @@ router.post('/offline-advance', verifyToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' })
     
-    const { wargaId, jumlahBulan } = req.body
+    const { wargaId, jumlahBulan, tipe, jumlah } = req.body
     const wId = parseInt(wargaId)
     const jBulan = parseInt(jumlahBulan) || 1
-    const tId = `OFF-${Date.now()}` // Transaksi ID untuk grouping
+    const iuranTipe = tipe || 'makam'
+    const tId = `OFF-${Date.now()}`
 
     const warga = await prisma.warga.findUnique({ where: { id: wId } })
     if (!warga) return res.status(404).json({ message: 'Warga not found' })
 
-    const jumlahTagihan = 10000 * (warga.jumlahMakam || 1)
+    const jumlahTagihan = parseInt(jumlah) || 0
+    if (jumlahTagihan <= 0) return res.status(400).json({ message: 'Nominal iuran wajib diisi' })
 
-    // 1. Ambil tagihan belum bayar yang sudah ada
+    // 1. Ambil tagihan belum bayar yang sudah ada untuk tipe ini
     const existingBelumBayar = await prisma.iuran.findMany({
-      where: { wargaId: wId, status: 'belum_bayar' },
+      where: { wargaId: wId, status: 'belum_bayar', tipe: iuranTipe },
       orderBy: [{ tahun: 'asc' }, { bulan: 'asc' }],
       take: jBulan
     })
@@ -312,7 +411,7 @@ router.post('/offline-advance', verifyToken, async (req, res) => {
     const remainingMonths = jBulan - processedMonths
     if (remainingMonths > 0) {
       const lastIuran = await prisma.iuran.findFirst({
-        where: { wargaId: wId },
+        where: { wargaId: wId, tipe: iuranTipe },
         orderBy: [{ tahun: 'desc' }, { bulan: 'desc' }]
       })
 
@@ -338,6 +437,7 @@ router.post('/offline-advance', verifyToken, async (req, res) => {
         }
         newIurans.push({
           wargaId: wId,
+          tipe: iuranTipe,
           tahun: t,
           bulan: b,
           jumlah: jumlahTagihan,
@@ -351,11 +451,13 @@ router.post('/offline-advance', verifyToken, async (req, res) => {
       processedMonths += remainingMonths
     }
 
-    // 3. Update bulanTerbayar di model Warga
-    await prisma.warga.update({
-      where: { id: wId },
-      data: { bulanTerbayar: { increment: processedMonths } }
-    })
+    // 3. Update bulanTerbayar di model Warga (only for makam type)
+    if (iuranTipe === 'makam') {
+      await prisma.warga.update({
+        where: { id: wId },
+        data: { bulanTerbayar: { increment: processedMonths } }
+      })
+    }
 
     res.json({ message: `Berhasil mencatat pembayaran offline untuk ${jBulan} bulan.` })
   } catch (error) {
@@ -373,33 +475,7 @@ router.post('/kirim-pengingat', verifyToken, async (req, res) => {
     const currentMonth = now.getMonth() + 1
     const currentYear = now.getFullYear()
 
-    // 1. Ambil semua warga
-    const allWarga = await prisma.warga.findMany({
-      include: {
-        iuran: {
-          where: {
-            bulan: currentMonth,
-            tahun: currentYear
-          }
-        }
-      }
-    })
-
-    // 2. Identifikasi warga yang belum punya record iuran bulan ini (baru daftar)
-    const missingIuran = allWarga.filter(w => w.iuran.length === 0)
-    
-    if (missingIuran.length > 0) {
-      const newIurans = missingIuran.map(w => ({
-        wargaId: w.id,
-        bulan: currentMonth,
-        tahun: currentYear,
-        jumlah: (w.jumlahMakam || 1) * 10000,
-        status: 'belum_bayar'
-      }))
-      await prisma.iuran.createMany({ data: newIurans })
-    }
-
-    // 3. Ambil ulang semua yang statusnya 'belum_bayar' (termasuk yang baru dibuat)
+    // Ambil semua yang statusnya 'belum_bayar'
     const belumBayar = await prisma.iuran.findMany({
       where: {
         bulan: currentMonth,
@@ -415,17 +491,25 @@ router.post('/kirim-pengingat', verifyToken, async (req, res) => {
       return res.json({ message: 'Tidak ada warga yang perlu diingatkan bulan ini.' })
     }
 
-    const notifications = belumBayar.map(item => ({
-      userId: item.warga.userId,
-      title: 'Tagihan Iuran Makam',
-      message: `Halo! Mohon segera melakukan pembayaran iuran makam periode ${currentMonth}/${currentYear}. Terima kasih!`
+    // Group by userId to avoid duplicate notifications
+    const userNotifMap = {}
+    belumBayar.forEach(item => {
+      const uid = item.warga.userId
+      if (!userNotifMap[uid]) userNotifMap[uid] = []
+      userNotifMap[uid].push(item.tipe === 'warga' ? 'Iuran Warga' : 'Iuran Makam')
+    })
+
+    const notifications = Object.entries(userNotifMap).map(([userId, tipes]) => ({
+      userId: parseInt(userId),
+      title: 'Tagihan Iuran RT',
+      message: `Halo! Mohon segera melakukan pembayaran ${tipes.join(' & ')} periode ${currentMonth}/${currentYear}. Terima kasih!`
     }))
 
     await prisma.notification.createMany({
       data: notifications
     })
 
-    res.json({ message: `Berhasil mengirim ${notifications.length} pengingat (termasuk membuat ${missingIuran.length} tagihan baru).` })
+    res.json({ message: `Berhasil mengirim ${notifications.length} pengingat.` })
   } catch (error) {
     console.error('Error kirim-pengingat:', error)
     res.status(500).json({ error: 'Internal server error' })

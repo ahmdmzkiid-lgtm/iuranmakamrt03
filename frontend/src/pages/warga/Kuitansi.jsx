@@ -4,7 +4,7 @@ import api from '../../services/api'
 
 const formatRp = (n) => 'Rp ' + Number(n).toLocaleString('id-ID')
 
-const filterOptions = ['Semua', 'Iuran Makam']
+const filterOptions = ['Semua', 'Iuran Warga', 'Iuran Makam']
 
 const getBulanName = (bln) => {
   const bulan = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
@@ -55,7 +55,8 @@ export default function WargaKuitansi() {
           return {
             id: item.transaksiId || `KWT-${item.tahun}-${String(item.bulan).padStart(2, '0')}-${item.id}`,
             invoiceId: item.transaksiId || `INV-${item.id}`,
-            jenis: 'Iuran Makam',
+            tipe: item.tipe,
+            jenis: item.tipe === 'warga' ? 'Iuran Warga' : 'Iuran Makam',
             bulan: periodeStr,
             nominal: item.nominal,
             metode: item.metode || 'Transfer',
@@ -64,7 +65,7 @@ export default function WargaKuitansi() {
             tanggalVerifikasi: item.tanggalBayar ? new Date(item.tanggalBayar).toLocaleDateString('id-ID') : '-',
             diverifikasiOleh: 'Admin RT',
             status: 'lunas',
-            icon: 'deceased',
+            icon: item.tipe === 'warga' ? 'groups' : 'deceased',
             isMultiMonth: item.bulanList.length > 1,
             namaWarga: item.warga?.user?.nama || 'Warga'
           }
@@ -85,7 +86,7 @@ export default function WargaKuitansi() {
   const filteredData = kuitansiData.filter((k) => {
     const matchFilter =
       filter === 'Semua' ||
-      (filter === 'Iuran Makam' && k.jenis.includes('Iuran Makam'))
+      k.jenis === filter
 
     const matchSearch =
       searchQuery === '' ||
@@ -131,8 +132,8 @@ export default function WargaKuitansi() {
       <body>
         <div class="receipt">
           <div class="receipt-header">
-            <h1>IURAN MAKAM RT 03</h1>
-            <p>Kuitansi Pembayaran Iuran Warga RT 03</p>
+            <h1>IURAN RT 03</h1>
+            <p>Kuitansi Pembayaran ${kuitansi.jenis} RT 03</p>
           </div>
           <div class="receipt-id">
             <span class="id">${kuitansi.id}</span>
@@ -341,10 +342,10 @@ export default function WargaKuitansi() {
                     {/* Receipt Header */}
                     <div className="bg-primary text-white p-4 border-b-4 border-black text-center">
                       <h2 className="font-display-bold text-xl md:text-2xl uppercase tracking-tight">
-                        IURAN MAKAM RT 03
+                        IURAN RT 03
                       </h2>
                       <p className="text-[10px] font-label-bold uppercase opacity-80 mt-1">
-                        Kuitansi Pembayaran Iuran Warga RT 03
+                        Kuitansi Pembayaran {selectedKuitansi.jenis} RT 03
                       </p>
                     </div>
 
@@ -430,11 +431,21 @@ export default function WargaKuitansi() {
                 </h4>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
+                    <span className="text-zinc-600 font-bold">Iuran Warga</span>
+                    <span className="font-bold">
+                      {formatRp(
+                        kuitansiData
+                          .filter((k) => k.jenis === 'Iuran Warga')
+                          .reduce((s, k) => s + k.nominal, 0)
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
                     <span className="text-zinc-600 font-bold">Iuran Makam</span>
                     <span className="font-bold">
                       {formatRp(
                         kuitansiData
-                          .filter((k) => k.jenis.includes('Iuran Makam'))
+                          .filter((k) => k.jenis === 'Iuran Makam')
                           .reduce((s, k) => s + k.nominal, 0)
                       )}
                     </span>

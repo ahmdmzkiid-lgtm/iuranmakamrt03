@@ -77,7 +77,7 @@ export default function WargaLayout({ children }) {
         <div className="flex items-center gap-2 md:gap-4 min-w-0">
           <div className="bg-black text-white px-3 py-1 border-2 border-black rotate-[-1deg] neubrutal-shadow-sm">
             <h1 className="font-['Inter'] font-black uppercase tracking-tight text-sm md:text-base leading-tight">
-              IURAN MAKAM <span className="text-primary-fixed">RT 03</span>
+              IURAN <span className="text-primary-fixed">RT 03</span>
             </h1>
           </div>
         </div>
@@ -191,10 +191,10 @@ export default function WargaLayout({ children }) {
 
         <footer className="mt-16 md:mt-32 pb-8 border-t-4 border-black pt-8 flex flex-col items-center gap-2 text-center">
           <p className="font-label-bold uppercase text-[10px] md:text-xs">
-            © 2026 Iuran Makam RT 03 - Limo. DIBUAT OLEH <a href="https://ahmdmzki.web.id" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary transition-colors">ahmdmzki.web.id</a>
+            © 2026 Iuran RT 03 - Limo. DIBUAT OLEH <a href="https://ahmdmzki.web.id" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary transition-colors">ahmdmzki.web.id</a>
           </p>
           <p className="text-[9px] uppercase font-bold text-zinc-400">
-            Portal Warga - Sistem Informasi Iuran Lingkungan
+            Portal Warga - Sistem Informasi Iuran RT
           </p>
         </footer>
       </main>

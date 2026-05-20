@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import AdminLayout from '../../components/admin/AdminLayout'
 import api from '../../services/api'
 import { useNotification } from '../../context/NotificationContext'
 import { generateExcelReport } from '../../utils/excelReport'
+import * as XLSX from 'xlsx'
 
 export default function AdminWarga() {
   const [wargaData, setWargaData] = useState([])
@@ -13,17 +14,30 @@ export default function AdminWarga() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editId, setEditId] = useState(null)
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [exportFilters, setExportFilters] = useState({ bulan: (new Date().getMonth() + 1).toString(), tahun: new Date().getFullYear().toString() })
+  const [showNoDataModal, setShowNoDataModal] = useState(false)
   const { showAlert, showConfirm } = useNotification()
+  const getBulanName = (bln) => {
+    const bulan = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
+    return bulan[bln - 1] || bln
+  }
   const [formData, setFormData] = useState({
     nama: '',
+    nik: '',
     nomorKK: '',
     password: '',
     alamat: '',
     telepon: '',
-    jumlahMakam: 1,
     bulanTerbayar: 0,
-    daftarAlmarhum: []
+    anggotaKeluarga: []
   })
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [showGuideModal, setShowGuideModal] = useState(false)
+  const [importData, setImportData] = useState([])
+  const [importLoading, setImportLoading] = useState(false)
+  const [importResult, setImportResult] = useState(null)
+  const fileInputRef = useRef(null)
 
   const [iuranData, setIuranData] = useState([])
   
@@ -84,18 +98,29 @@ export default function AdminWarga() {
     }
   }
 
+  const handleResetPassword = async (id, nama) => {
+    if (!(await showConfirm(`Reset password ${nama} ke nomor KK? Warga akan diminta membuat password baru saat login.`))) return
+    try {
+      await api.post(`/warga/${id}/reset-password`)
+      showAlert('Password berhasil direset ke nomor KK')
+    } catch (error) {
+      console.error('Failed to reset password', error)
+      showAlert('Gagal mereset password')
+    }
+  }
+
   const handleEdit = (warga) => {
     setIsEditing(true)
     setEditId(warga.id)
     setFormData({
       nama: warga.user?.nama || '',
+      nik: warga.user?.nik || '',
       nomorKK: warga.user?.nomorKK || '',
-      password: '', // Kosongkan password saat edit
+      password: '',
       alamat: warga.alamat || '',
       telepon: warga.telepon || '',
-      jumlahMakam: warga.jumlahMakam || 1,
       bulanTerbayar: warga.bulanTerbayar || 0,
-      daftarAlmarhum: warga.daftarAlmarhum || []
+      anggotaKeluarga: warga.anggotaKeluarga || []
     })
     setShowModal(true)
   }
@@ -105,27 +130,43 @@ export default function AdminWarga() {
     setIsEditing(false)
     setEditId(null)
     setFormData({
-      nama: '', nomorKK: '', password: '', alamat: '', telepon: '', jumlahMakam: 1, bulanTerbayar: 0, daftarAlmarhum: []
+      nama: '', nik: '', nomorKK: '', password: '', alamat: '', telepon: '', bulanTerbayar: 0, anggotaKeluarga: []
     })
   }
 
-  const totalWarga = wargaData.length
-  // Sementara asumsikan semua warga aktif untuk demo jika tidak ada flag khusus
-  const wargaAktif = wargaData.length 
+  const totalKK = wargaData.length
+  // Total warga = KK + semua anggota keluarga
+  const totalWarga = wargaData.reduce((sum, w) => {
+    const anggota = Array.isArray(w.anggotaKeluarga) ? w.anggotaKeluarga.length : 0
+    return sum + 1 + anggota // 1 untuk kepala keluarga + anggota
+  }, 0) 
   
   // Hitung kelengkapan KK (asumsikan KK lengkap jika ada user.nomorKK)
   const kkLengkap = wargaData.filter(w => w.user?.nomorKK).length
-  const kkPercent = totalWarga > 0 ? Math.round((kkLengkap / totalWarga) * 100) : 0
+  const kkPercent = totalKK > 0 ? Math.round((kkLengkap / totalKK) * 100) : 0
+
+  const currentMonth = new Date().getMonth() + 1
+  const currentYear = new Date().getFullYear()
 
   const filteredData = wargaData.filter(w => {
     const nama = w.user?.nama?.toLowerCase() || ''
     const kk = w.user?.nomorKK?.toLowerCase() || ''
     const matchesSearch = nama.includes(searchQuery.toLowerCase()) || kk.includes(searchQuery.toLowerCase())
     
-    // Karena kita saat ini belum punya field status_warga, kita tampilkan semua, atau bisa difilter
-    // jika nanti ada field khusus. Untuk sekarang semua dianggap 'aktif'
-    const status = 'aktif'
-    const matchesStatus = statusFilter === 'SEMUA STATUS' || statusFilter.toLowerCase() === status
+    // Filter berdasarkan status pembayaran bulan ini
+    const hasLunasThisMonth = iuranData.some(i => 
+      i.wargaId === w.id && 
+      i.bulan === currentMonth && 
+      i.tahun === currentYear && 
+      i.status === 'lunas'
+    )
+    
+    let matchesStatus = true
+    if (statusFilter === 'LUNAS') {
+      matchesStatus = hasLunasThisMonth
+    } else if (statusFilter === 'BELUM BAYAR') {
+      matchesStatus = !hasLunasThisMonth
+    }
     
     return matchesSearch && matchesStatus
   })
@@ -134,25 +175,17 @@ export default function AdminWarga() {
     <AdminLayout>
       <div className="max-w-7xl mx-auto max-w-full">
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-lg">
-          <div className="space-y-2">
-            <h1 className="font-display-bold text-headline-md md:text-display-bold uppercase">
-              Kelola Data Warga
-            </h1>
-            <p className="font-body-lg text-zinc-600 max-w-xl">
-              Pusat administrasi kependudukan tingkat RT. Kelola status, alamat, dan nomor kartu keluarga secara efisien.
-            </p>
+        <div className="mb-lg">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-4">
+            <div className="space-y-2">
+              <h1 className="font-display-bold text-headline-md md:text-display-bold uppercase">
+                Kelola Data Warga
+              </h1>
+              <p className="font-body-lg text-zinc-600 max-w-xl">
+                Pusat administrasi kependudukan tingkat RT. Kelola status, alamat, dan nomor kartu keluarga secara efisien.
+              </p>
+            </div>
           </div>
-          <button 
-            onClick={() => {
-              setIsEditing(false)
-              setShowModal(true)
-            }}
-            className="bg-secondary text-on-secondary border-4 border-black px-4 py-2 md:px-6 md:py-3 text-sm md:text-base font-headline-md uppercase neubrutal-shadow active-press flex items-center gap-2 w-full md:w-auto justify-center"
-          >
-            <span className="material-symbols-outlined">person_add</span>
-            Tambah Warga
-          </button>
         </div>
 
         {/* Modal Tambah/Edit Warga */}
@@ -171,13 +204,17 @@ export default function AdminWarga() {
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block font-label-bold uppercase mb-2">Nama Lengkap</label>
+                      <label className="block font-label-bold uppercase mb-2">Nama Kepala Keluarga</label>
                       <input required type="text" name="nama" value={formData.nama} onChange={handleInputChange} className="w-full px-4 py-3 border-4 border-black font-body-md focus:bg-tertiary-fixed focus:outline-none transition-colors" placeholder="Cth: Budi Santoso" />
                     </div>
                     <div>
-                      <label className="block font-label-bold uppercase mb-2">Nomor KK (Username Login)</label>
-                      <input required type="text" name="nomorKK" value={formData.nomorKK} onChange={handleInputChange} className="w-full px-4 py-3 border-4 border-black font-body-md focus:bg-tertiary-fixed focus:outline-none transition-colors" placeholder="Cth: 317500123456" />
+                      <label className="block font-label-bold uppercase mb-2">NIK Kepala Keluarga</label>
+                      <input type="text" name="nik" value={formData.nik} onChange={handleInputChange} className="w-full px-4 py-3 border-4 border-black font-body-md focus:bg-tertiary-fixed focus:outline-none transition-colors" placeholder="Cth: 3175001234560001" />
                     </div>
+                  </div>
+                  <div>
+                    <label className="block font-label-bold uppercase mb-2">Nomor KK (Username Login)</label>
+                    <input required type="text" name="nomorKK" value={formData.nomorKK} onChange={handleInputChange} className="w-full px-4 py-3 border-4 border-black font-body-md focus:bg-tertiary-fixed focus:outline-none transition-colors" placeholder="Cth: 317500123456" />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -195,16 +232,56 @@ export default function AdminWarga() {
                     <label className="block font-label-bold uppercase mb-2">No Rumah</label>
                     <input type="text" name="alamat" value={formData.alamat} onChange={handleInputChange} className="w-full px-4 py-3 border-4 border-black font-body-md focus:bg-tertiary-fixed focus:outline-none transition-colors" placeholder="Cth: Blok A No 12" />
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-tertiary-fixed p-4 border-4 border-black">
-                    <div>
-                      <label className="block font-label-bold uppercase mb-2">Jumlah Makam</label>
-                      <input required type="number" min="1" name="jumlahMakam" value={formData.jumlahMakam} onChange={handleInputChange} className="w-full px-4 py-3 border-4 border-black font-body-md focus:bg-white focus:outline-none transition-colors" />
+                  <div className="bg-tertiary-fixed p-4 border-4 border-black">
+                    <div className="flex justify-between items-center mb-3">
+                      <label className="font-label-bold uppercase">Anggota Keluarga</label>
+                      <button type="button" onClick={() => setFormData(prev => ({ ...prev, anggotaKeluarga: [...prev.anggotaKeluarga, { nama: '', nik: '' }] }))} className="px-3 py-1 border-2 border-black bg-white font-label-bold text-[10px] uppercase hover:bg-zinc-100">
+                        + Tambah
+                      </button>
                     </div>
-                    <div>
-                      <label className="block font-label-bold uppercase mb-2">Bulan Terbayar Sebelumnya</label>
-                      <input required type="number" min="0" max="35" name="bulanTerbayar" value={formData.bulanTerbayar} onChange={handleInputChange} className="w-full px-4 py-3 border-4 border-black font-body-md focus:bg-white focus:outline-none transition-colors" />
-                      <p className="text-xs font-body-md mt-1 text-zinc-600">Sisa bulan akan dihitung dari 35 bulan.</p>
+                    {formData.anggotaKeluarga.length === 0 && (
+                      <p className="text-xs text-zinc-500 italic">Belum ada anggota keluarga.</p>
+                    )}
+                    <div className="space-y-2">
+                      {formData.anggotaKeluarga.map((anggota, idx) => (
+                        <div key={idx} className="flex gap-2 items-start">
+                          <div className="flex-1 grid grid-cols-2 gap-2">
+                            <input
+                              type="text"
+                              value={typeof anggota === 'string' ? anggota : anggota.nama || ''}
+                              onChange={(e) => {
+                                const updated = [...formData.anggotaKeluarga]
+                                updated[idx] = typeof updated[idx] === 'string' ? { nama: e.target.value, nik: '' } : { ...updated[idx], nama: e.target.value }
+                                setFormData(prev => ({ ...prev, anggotaKeluarga: updated }))
+                              }}
+                              placeholder={`Nama anggota #${idx + 1}`}
+                              className="px-3 py-2 border-4 border-black font-body-md focus:bg-white focus:outline-none transition-colors text-sm"
+                            />
+                            <input
+                              type="text"
+                              value={typeof anggota === 'string' ? '' : anggota.nik || ''}
+                              onChange={(e) => {
+                                const updated = [...formData.anggotaKeluarga]
+                                updated[idx] = typeof updated[idx] === 'string' ? { nama: updated[idx], nik: e.target.value } : { ...updated[idx], nik: e.target.value }
+                                setFormData(prev => ({ ...prev, anggotaKeluarga: updated }))
+                              }}
+                              placeholder="NIK"
+                              className="px-3 py-2 border-4 border-black font-body-md focus:bg-white focus:outline-none transition-colors text-sm"
+                            />
+                          </div>
+                          <button type="button" onClick={() => {
+                            const updated = formData.anggotaKeluarga.filter((_, i) => i !== idx)
+                            setFormData(prev => ({ ...prev, anggotaKeluarga: updated }))
+                          }} className="p-2 border-2 border-black bg-error-container hover:bg-error transition-all">
+                            <span className="material-symbols-outlined text-sm">close</span>
+                          </button>
+                        </div>
+                      ))}
                     </div>
+                  </div>
+                  <div>
+                    <label className="block font-label-bold uppercase mb-2">Bulan Terbayar Sebelumnya</label>
+                    <input required type="number" min="0" max="35" name="bulanTerbayar" value={formData.bulanTerbayar} onChange={handleInputChange} className="w-full px-4 py-3 border-4 border-black font-body-md focus:bg-tertiary-fixed focus:outline-none transition-colors" />
                   </div>
                   <div className="pt-4 flex justify-end gap-4">
                     <button type="button" onClick={closeModal} className="px-6 py-3 border-4 border-black font-label-bold uppercase hover:bg-surface-variant transition-colors">Batal</button>
@@ -218,24 +295,231 @@ export default function AdminWarga() {
           </div>
         )}
 
+        {/* Import Modal */}
+        {showImportModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white border-4 border-black w-full max-w-3xl max-h-[90vh] overflow-y-auto neubrutal-shadow flex flex-col">
+              <div className="p-4 md:p-6 border-b-4 border-black flex justify-between items-center bg-surface-bright sticky top-0 z-10">
+                <h2 className="font-display-bold text-xl md:text-2xl uppercase">Import Data Warga</h2>
+                <button onClick={() => setShowImportModal(false)} className="hover:text-error transition-colors">
+                  <span className="material-symbols-outlined text-3xl">close</span>
+                </button>
+              </div>
+              <div className="p-4 md:p-6 space-y-4">
+                <div className="bg-tertiary-fixed border-4 border-black p-4">
+                  <h3 className="font-label-bold uppercase text-xs mb-2">Format Kolom Excel</h3>
+                  <p className="text-xs text-zinc-600 mb-2">File Excel harus memiliki kolom berikut di baris pertama (header):</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['NO_KK', 'NAMA_KK', 'NIK_KK', 'ALAMAT', 'TELEPON', 'ANGGOTA_1_NAMA', 'ANGGOTA_1_NIK', 'ANGGOTA_2_NAMA', 'ANGGOTA_2_NIK', '...'].map(col => (
+                      <span key={col} className="bg-white border-2 border-black px-2 py-1 text-[10px] font-mono font-bold">{col}</span>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-zinc-500 mt-2">Password default = Nomor KK. Kolom anggota bisa ditambah: ANGGOTA_3_NAMA, ANGGOTA_3_NIK, dst.</p>
+                </div>
+
+                <div>
+                  <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => {
+                    const file = e.target.files[0]
+                    if (!file) return
+                    const reader = new FileReader()
+                    reader.onload = (evt) => {
+                      try {
+                        const data = new Uint8Array(evt.target.result)
+                        const wb = XLSX.read(data, { type: 'array' })
+                        const ws = wb.Sheets[wb.SheetNames[0]]
+
+                        // Read as raw arrays to find the real header row
+                        const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false })
+                        const normCell = (v) => String(v || '').replace(/[\s\-\.]/g, '_').toUpperCase().trim()
+
+                        // Find header row by scanning for a row containing NO_KK or NAMA_KK
+                        let headerIdx = -1
+                        for (let i = 0; i < Math.min(rawRows.length, 10); i++) {
+                          const cells = rawRows[i].map(c => normCell(c))
+                          if (cells.some(c => c === 'NO_KK' || c === 'NAMA_KK')) {
+                            headerIdx = i
+                            break
+                          }
+                        }
+
+                        if (headerIdx === -1) {
+                          setImportResult({ message: 'Header tidak ditemukan. Pastikan ada kolom NO_KK dan NAMA_KK.', failed: 1, errors: [`Baris 1-10 tidak mengandung header NO_KK/NAMA_KK`] })
+                          setImportData([])
+                          return
+                        }
+
+                        // Use found header row as column names
+                        const headers = rawRows[headerIdx].map(c => normCell(c))
+                        console.log('Detected headers at row', headerIdx + 1, ':', headers)
+
+                        const dataRows = rawRows.slice(headerIdx + 1).filter(r => r.some(c => String(c).trim()))
+                        const stripSpaces = (v) => String(v || '').replace(/\s/g, '')
+                        const getCol = (row, ...names) => {
+                          for (const name of names) {
+                            const idx = headers.indexOf(name)
+                            if (idx !== -1 && row[idx] !== undefined && String(row[idx]).trim()) return String(row[idx]).trim()
+                          }
+                          return ''
+                        }
+
+                        const parsed = dataRows.map(row => {
+                          const anggota = []
+                          for (let i = 1; i <= 20; i++) {
+                            const nama = getCol(row, `ANGGOTA_${i}_NAMA`, `ANGGOTA${i}_NAMA`, `ANGGOTA_${i}`)
+                            const nik = getCol(row, `ANGGOTA_${i}_NIK`, `ANGGOTA${i}_NIK`, `NIK_ANGGOTA_${i}`)
+                            if (nama) anggota.push({ nama, nik: stripSpaces(nik) })
+                          }
+                          return {
+                            nomorKK: stripSpaces(getCol(row, 'NO_KK', 'NOMOR_KK', 'KK')),
+                            nama: getCol(row, 'NAMA_KK', 'NAMA_KEPALA_KELUARGA', 'NAMA', 'KEPALA_KELUARGA'),
+                            nik: stripSpaces(getCol(row, 'NIK_KK', 'NIK_KEPALA_KELUARGA', 'NIK')),
+                            alamat: getCol(row, 'ALAMAT', 'NO_RUMAH', 'RUMAH'),
+                            telepon: stripSpaces(getCol(row, 'TELEPON', 'NO_TELEPON', 'HP', 'NO_HP', 'TELP')),
+                            anggotaKeluarga: anggota
+                          }
+                        }).filter(r => r.nama && r.nomorKK)
+
+                        console.log('Parsed import data:', parsed)
+                        if (parsed.length === 0) {
+                          setImportResult({ message: 'Tidak ada data valid. Pastikan kolom NO_KK dan NAMA_KK terisi.', failed: 1, errors: [`Header ditemukan: ${headers.filter(h => h).join(', ')}`] })
+                        }
+                        setImportData(parsed)
+                      } catch (err) {
+                        console.error('Excel parse error:', err)
+                        setImportResult({ message: 'Gagal membaca file Excel: ' + err.message, failed: 1, errors: [] })
+                      }
+                    }
+                    reader.readAsArrayBuffer(file)
+                    e.target.value = ''
+                  }} />
+                  <button onClick={() => fileInputRef.current?.click()} className="w-full border-4 border-dashed border-black p-8 text-center hover:bg-zinc-50 transition-colors">
+                    <span className="material-symbols-outlined text-4xl text-zinc-400 mb-2 block">upload_file</span>
+                    <p className="font-label-bold uppercase text-sm">{importData.length > 0 ? `${importData.length} data siap diimport` : 'Pilih File Excel (.xlsx)'}</p>
+                    <p className="text-[10px] text-zinc-400 mt-1">Klik untuk memilih file</p>
+                  </button>
+                </div>
+
+                {importData.length > 0 && (
+                  <div className="border-4 border-black overflow-hidden">
+                    <div className="bg-zinc-100 border-b-2 border-black p-3">
+                      <p className="font-label-bold uppercase text-xs">Preview Data ({importData.length} baris)</p>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto">
+                      <table className="w-full text-xs">
+                        <thead className="bg-zinc-50 sticky top-0">
+                          <tr className="border-b-2 border-black">
+                            <th className="p-2 text-left">#</th>
+                            <th className="p-2 text-left">No KK</th>
+                            <th className="p-2 text-left">Nama KK</th>
+                            <th className="p-2 text-left">NIK KK</th>
+                            <th className="p-2 text-left">Anggota</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {importData.slice(0, 50).map((row, idx) => (
+                            <tr key={idx} className="border-b border-zinc-200">
+                              <td className="p-2">{idx + 1}</td>
+                              <td className="p-2 font-mono">{row.nomorKK}</td>
+                              <td className="p-2 font-bold">{row.nama}</td>
+                              <td className="p-2 font-mono">{row.nik || '-'}</td>
+                              <td className="p-2">{row.anggotaKeluarga.length} orang</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {importResult && (
+                  <div className={`border-4 border-black p-4 ${importResult.failed > 0 ? 'bg-error-container' : 'bg-secondary-container'}`}>
+                    <p className="font-label-bold uppercase text-sm mb-1">{importResult.message}</p>
+                    {importResult.errors?.length > 0 && (
+                      <div className="mt-2 max-h-32 overflow-y-auto text-xs space-y-1">
+                        {importResult.errors.map((err, i) => <p key={i} className="text-error">• {err}</p>)}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-4 pt-2">
+                  <button type="button" onClick={() => setShowImportModal(false)} className="px-6 py-3 border-4 border-black font-label-bold uppercase hover:bg-surface-variant transition-colors">Batal</button>
+                  <button
+                    disabled={importData.length === 0 || importLoading}
+                    onClick={async () => {
+                      setImportLoading(true)
+                      try {
+                        const res = await api.post('/warga/import', { data: importData })
+                        setImportResult(res.data)
+                        if (res.data.success > 0) fetchWarga()
+                      } catch (err) {
+                        setImportResult({ message: err.response?.data?.error || 'Gagal import', failed: 1, errors: [] })
+                      } finally {
+                        setImportLoading(false)
+                      }
+                    }}
+                    className="px-6 py-3 bg-primary text-white border-4 border-black font-label-bold uppercase neubrutal-shadow active-press disabled:opacity-50"
+                  >
+                    {importLoading ? 'Mengimport...' : `Import ${importData.length} Data`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-gutter mb-lg">
-          <div className="bg-tertiary-fixed border-4 border-black p-md neubrutal-shadow">
-            <p className="font-label-bold uppercase mb-2">Total Warga</p>
-            <p className="font-display-bold text-2xl md:text-headline-lg">{loading ? '...' : totalWarga}</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-gutter mb-4">
+          <button 
+            onClick={() => {
+              setIsEditing(false)
+              setShowModal(true)
+            }}
+            className="bg-secondary text-on-secondary border-4 border-black p-4 md:p-6 neubrutal-shadow active-press flex flex-col items-start gap-2 text-left hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"
+          >
+            <span className="material-symbols-outlined text-2xl md:text-3xl">person_add</span>
+            <p className="font-headline-md uppercase text-sm md:text-base">Tambah Warga</p>
+          </button>
+          <button 
+            onClick={() => { setShowImportModal(true); setImportData([]); setImportResult(null) }}
+            className="bg-tertiary-fixed border-4 border-black p-4 md:p-6 neubrutal-shadow active-press flex flex-col items-start gap-2 text-left hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"
+          >
+            <span className="material-symbols-outlined text-2xl md:text-3xl">upload_file</span>
+            <p className="font-headline-md uppercase text-sm md:text-base">Import Excel</p>
+          </button>
+          <div className="bg-tertiary-fixed border-4 border-black p-4 md:p-6 neubrutal-shadow">
+            <p className="font-label-bold uppercase mb-2 text-xs">Total KK</p>
+            <p className="font-display-bold text-3xl md:text-4xl">{loading ? '...' : totalKK}</p>
           </div>
-          <div className="bg-secondary-container border-4 border-black p-md neubrutal-shadow">
-            <p className="font-label-bold uppercase mb-2">Warga Aktif</p>
-            <p className="font-display-bold text-2xl md:text-headline-lg">{loading ? '...' : wargaAktif}</p>
+          <div className="bg-secondary-container border-4 border-black p-4 md:p-6 neubrutal-shadow">
+            <p className="font-label-bold uppercase mb-2 text-xs">Total Warga</p>
+            <p className="font-display-bold text-3xl md:text-4xl">{loading ? '...' : totalWarga}</p>
           </div>
-          <div className="col-span-1 md:col-span-2 bg-white border-4 border-black p-md neubrutal-shadow flex items-center justify-between">
-            <div>
-              <p className="font-label-bold uppercase mb-2">Kelengkapan Data KK</p>
-              <p className="font-display-bold text-2xl md:text-headline-lg">{loading ? '...' : `${kkPercent}%`}</p>
+        </div>
+        <div className="mb-lg">
+          <div className="bg-primary-container border-4 border-black p-4 md:p-gutter neubrutal-shadow relative overflow-hidden">
+            <div className="relative z-10">
+              <h3 className="font-headline-md text-white mb-2 uppercase">Butuh Export Data?</h3>
+              <p className="text-white font-body-md mb-4">
+                Download data warga dalam format Excel untuk laporan bulanan RT 03.
+              </p>
+              <button 
+                onClick={() => {
+                  const currentMonth = new Date().getMonth() + 1
+                  setExportFilters({
+                    bulan: currentMonth.toString(),
+                    tahun: new Date().getFullYear().toString()
+                  })
+                  setShowExportModal(true)
+                }}
+                className="bg-tertiary-fixed border-2 border-black px-4 py-2 font-label-bold uppercase neubrutal-shadow hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"
+              >
+                Download .XLSX
+              </button>
             </div>
-            <div className="w-32 h-4 bg-surface-variant border-2 border-black overflow-hidden">
-              <div className="h-full bg-primary border-r-2 border-black transition-all duration-1000" style={{ width: `${kkPercent}%` }} />
-            </div>
+            <span className="material-symbols-outlined absolute -right-4 -bottom-4 text-white opacity-20 text-[120px] rotate-12">
+              cloud_download
+            </span>
           </div>
         </div>
 
@@ -260,8 +544,8 @@ export default function AdminWarga() {
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
                 <option>SEMUA STATUS</option>
-                <option>AKTIF</option>
-                <option>TIDAK AKTIF</option>
+                <option>LUNAS</option>
+                <option>BELUM BAYAR</option>
               </select>
               <button className="bg-white border-4 border-black p-2 md:p-3 neubrutal-shadow hover:bg-tertiary-fixed transition-all shrink-0">
                 <span className="material-symbols-outlined">filter_list</span>
@@ -274,10 +558,9 @@ export default function AdminWarga() {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-secondary-container text-black uppercase font-label-bold text-left border-b-4 border-black">
-                  <th className="p-4 md:p-gutter border-r-4 border-black">Nama Lengkap</th>
-                  <th className="p-4 md:p-gutter border-r-4 border-black">Nomor KK</th>
-                  <th className="p-4 md:p-gutter border-r-4 border-black">Jml Makam</th>
-                  <th className="p-4 md:p-gutter border-r-4 border-black">Sisa Bulan</th>
+                  <th className="p-4 md:p-gutter border-r-4 border-black">No KK</th>
+                  <th className="p-4 md:p-gutter border-r-4 border-black">Kepala Keluarga</th>
+                  <th className="p-4 md:p-gutter border-r-4 border-black">Anggota Keluarga</th>
                   <th className="p-4 md:p-gutter border-r-4 border-black">No Rumah</th>
                   <th className="p-4 md:p-gutter">Aksi</th>
                 </tr>
@@ -299,25 +582,41 @@ export default function AdminWarga() {
                         idx % 2 === 1 ? 'bg-surface-bright' : ''
                       }`}
                     >
-                      <td className="p-4 md:p-gutter border-r-4 border-black font-bold">{row.user?.nama}</td>
                       <td className="p-4 md:p-gutter border-r-4 border-black font-mono text-sm">{row.user?.nomorKK || '-'}</td>
-                      <td className="p-4 md:p-gutter border-r-4 border-black text-center font-bold">
-                        {row.jumlahMakam}
+                      <td className="p-4 md:p-gutter border-r-4 border-black">
+                        <p className="font-bold">{row.user?.nama}</p>
+                        {row.user?.nik && <p className="text-xs text-zinc-600 font-mono font-bold">NIK: {row.user.nik}</p>}
                       </td>
-                      <td className="p-4 md:p-gutter border-r-4 border-black text-center font-bold">
-                        {Math.max(0, 35 - (row.bulanTerbayar || 0))} bln
+                      <td className="p-4 md:p-gutter border-r-4 border-black text-sm">
+                        {(row.anggotaKeluarga && row.anggotaKeluarga.length > 0)
+                          ? row.anggotaKeluarga.filter(a => (typeof a === 'string' ? a : a?.nama)).map((a, i) => {
+                              const nama = typeof a === 'string' ? a : a.nama
+                              const nik = typeof a === 'string' ? '' : a.nik
+                              return <div key={i} className="font-bold">{nama}{nik ? <span className="text-xs text-zinc-500 font-mono ml-1">({nik})</span> : ''}</div>
+                            })
+                          : <span className="text-zinc-400 italic">-</span>
+                        }
                       </td>
                       <td className="p-4 md:p-gutter border-r-4 border-black text-sm">{row.alamat || '-'}</td>
                       <td className="p-4 md:p-gutter flex gap-2">
                         <button 
                           onClick={() => handleEdit(row)}
                           className="p-2 border-2 border-black bg-tertiary-fixed hover:bg-tertiary-container transition-all"
+                          title="Edit"
                         >
                           <span className="material-symbols-outlined text-sm">edit</span>
                         </button>
                         <button 
+                          onClick={() => handleResetPassword(row.id, row.user?.nama)}
+                          className="p-2 border-2 border-black bg-secondary-container hover:bg-secondary transition-all"
+                          title="Reset Password"
+                        >
+                          <span className="material-symbols-outlined text-sm">lock_reset</span>
+                        </button>
+                        <button 
                           onClick={() => handleDelete(row.id)}
                           className="p-2 border-2 border-black bg-error-container hover:bg-error transition-all"
+                          title="Hapus"
                         >
                           <span className="material-symbols-outlined text-sm">delete</span>
                         </button>
@@ -353,7 +652,7 @@ export default function AdminWarga() {
             <div className="bg-secondary text-white p-4 border-b-4 border-black flex justify-between items-center">
               <h3 className="font-display-bold text-sm md:text-base uppercase">Sudah Bayar Bulan Ini</h3>
               <span className="bg-white text-black px-2 py-1 text-[10px] font-black border-2 border-black">
-                {wargaData.filter(w => iuranData.some(i => i.wargaId === w.id && i.bulan === (new Date().getMonth() + 1) && i.tahun === new Date().getFullYear() && i.status === 'lunas')).length} WARGA
+                {wargaData.filter(w => iuranData.some(i => i.wargaId === w.id && i.bulan === (new Date().getMonth() + 1) && i.tahun === new Date().getFullYear() && i.status === 'lunas')).length} KK
               </span>
             </div>
             <div className="max-h-[400px] overflow-y-auto">
@@ -361,6 +660,7 @@ export default function AdminWarga() {
                 <thead className="bg-zinc-100 border-b-2 border-black sticky top-0">
                   <tr>
                     <th className="p-3 text-[10px] font-black uppercase border-r-2 border-black">Nama Warga</th>
+                    <th className="p-3 text-[10px] font-black uppercase border-r-2 border-black">Tipe</th>
                     <th className="p-3 text-[10px] font-black uppercase">Metode</th>
                   </tr>
                 </thead>
@@ -368,16 +668,25 @@ export default function AdminWarga() {
                   {wargaData
                     .filter(w => iuranData.some(i => i.wargaId === w.id && i.bulan === (new Date().getMonth() + 1) && i.tahun === new Date().getFullYear() && i.status === 'lunas'))
                     .map((w, idx) => {
-                      const iuran = iuranData.find(i => i.wargaId === w.id && i.bulan === (new Date().getMonth() + 1) && i.tahun === new Date().getFullYear() && i.status === 'lunas')
-                      return (
-                        <tr key={idx} className="border-b-2 border-black last:border-b-0">
-                          <td className="p-3 border-r-2 border-black font-bold">{w.user?.nama}</td>
-                          <td className="p-3 font-bold text-secondary uppercase">{iuran?.metode || '-'}</td>
+                      const iuranWarga = iuranData.find(i => i.wargaId === w.id && i.tipe === 'warga' && i.bulan === (new Date().getMonth() + 1) && i.tahun === new Date().getFullYear() && i.status === 'lunas')
+                      const iuranMakam = iuranData.find(i => i.wargaId === w.id && i.tipe === 'makam' && i.bulan === (new Date().getMonth() + 1) && i.tahun === new Date().getFullYear() && i.status === 'lunas')
+                      const rows = []
+                      if (iuranWarga) rows.push({ tipe: 'Warga', metode: iuranWarga.metode })
+                      if (iuranMakam) rows.push({ tipe: 'Makam', metode: iuranMakam.metode })
+                      return rows.map((r, rIdx) => (
+                        <tr key={`${idx}-${rIdx}`} className="border-b-2 border-black last:border-b-0">
+                          <td className="p-3 border-r-2 border-black font-bold">{rIdx === 0 ? w.user?.nama : ''}</td>
+                          <td className="p-3 border-r-2 border-black">
+                            <span className={`px-2 py-0.5 text-[10px] font-black border-2 border-black ${r.tipe === 'Warga' ? 'bg-primary text-white' : 'bg-secondary text-white'}`}>
+                              {r.tipe}
+                            </span>
+                          </td>
+                          <td className="p-3 font-bold text-secondary uppercase">{r.metode || '-'}</td>
                         </tr>
-                      )
+                      ))
                     })}
                   {wargaData.filter(w => iuranData.some(i => i.wargaId === w.id && i.bulan === (new Date().getMonth() + 1) && i.tahun === new Date().getFullYear() && i.status === 'lunas')).length === 0 && (
-                    <tr><td colSpan="2" className="p-4 text-center text-zinc-400 italic">Belum ada yang membayar</td></tr>
+                    <tr><td colSpan="3" className="p-4 text-center text-zinc-400 italic">Belum ada yang membayar</td></tr>
                   )}
                 </tbody>
               </table>
@@ -389,7 +698,7 @@ export default function AdminWarga() {
             <div className="bg-error text-white p-4 border-b-4 border-black flex justify-between items-center">
               <h3 className="font-display-bold text-sm md:text-base uppercase">Belum Bayar Bulan Ini</h3>
               <span className="bg-white text-black px-2 py-1 text-[10px] font-black border-2 border-black">
-                {wargaData.filter(w => !iuranData.some(i => i.wargaId === w.id && i.bulan === (new Date().getMonth() + 1) && i.tahun === new Date().getFullYear() && i.status === 'lunas')).length} WARGA
+                {wargaData.filter(w => !iuranData.some(i => i.wargaId === w.id && i.bulan === (new Date().getMonth() + 1) && i.tahun === new Date().getFullYear() && i.status === 'lunas')).length} KK
               </span>
             </div>
             <div className="max-h-[400px] overflow-y-auto">
@@ -404,11 +713,18 @@ export default function AdminWarga() {
                   {wargaData
                     .filter(w => !iuranData.some(i => i.wargaId === w.id && i.bulan === (new Date().getMonth() + 1) && i.tahun === new Date().getFullYear() && i.status === 'lunas'))
                     .map((w, idx) => {
-                      const tagihanBulanIni = (w.jumlahMakam || 1) * 10000
+                      const jumlahAnggota = Array.isArray(w.anggotaKeluarga) ? w.anggotaKeluarga.length : 0
+                      const tagihanWarga = 10000
+                      const tagihanMakam = 10000 * (1 + jumlahAnggota)
                       return (
                         <tr key={idx} className="border-b-2 border-black last:border-b-0">
                           <td className="p-3 border-r-2 border-black font-bold">{w.user?.nama}</td>
-                          <td className="p-3 font-bold text-error">Rp {tagihanBulanIni.toLocaleString('id-ID')}</td>
+                          <td className="p-3">
+                            <div className="flex flex-col gap-1">
+                              <span className="font-bold text-error">Warga: Rp {tagihanWarga.toLocaleString('id-ID')}</span>
+                              <span className="font-bold text-error">Makam: Rp {tagihanMakam.toLocaleString('id-ID')}</span>
+                            </div>
+                          </td>
                         </tr>
                       )
                     })}
@@ -419,36 +735,222 @@ export default function AdminWarga() {
         </div>
 
         {/* Contextual Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-gutter mb-24 md:mb-0">
-          <div className="bg-primary-container border-4 border-black p-4 md:p-gutter neubrutal-shadow relative overflow-hidden">
-            <div className="relative z-10">
-              <h3 className="font-headline-md text-white mb-2 uppercase">Butuh Export Data?</h3>
-              <p className="text-white font-body-md mb-4">
-                Download data warga dalam format Excel atau PDF untuk laporan bulanan Kelurahan.
-              </p>
-              <button 
-                onClick={() => generateExcelReport(wargaData, iuranData)}
-                className="bg-tertiary-fixed border-2 border-black px-4 py-2 font-label-bold uppercase neubrutal-shadow hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"
-              >
-                Download .XLSX
-              </button>
-            </div>
-            <span className="material-symbols-outlined absolute -right-4 -bottom-4 text-white opacity-20 text-[120px] rotate-12">
-              cloud_download
-            </span>
-          </div>
-          <div className="bg-white border-4 border-black p-4 md:p-gutter neubrutal-shadow flex items-center gap-4 md:gap-6">
+        <div className="mb-24 md:mb-0">
+          <button 
+            onClick={() => setShowGuideModal(true)}
+            className="w-full bg-white border-4 border-black p-4 md:p-gutter neubrutal-shadow flex items-center gap-4 md:gap-6 text-left hover:bg-zinc-50 transition-colors cursor-pointer"
+          >
             <div className="w-16 h-16 md:w-20 md:h-20 border-4 border-black bg-tertiary-fixed shrink-0 flex items-center justify-center">
               <span className="material-symbols-outlined text-3xl md:text-4xl">info</span>
             </div>
             <div>
               <h3 className="font-headline-md mb-2 uppercase">Panduan Admin</h3>
               <p className="font-body-md text-sm">
-                Gunakan fitur pencarian untuk menemukan warga berdasarkan nama atau NIK. Pastikan status warga selalu diperbarui setiap ada kepindahan.
+                Klik untuk melihat panduan lengkap pengelolaan data warga.
               </p>
             </div>
-          </div>
+          </button>
         </div>
+
+        {/* Modal Panduan Admin */}
+        {showGuideModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white border-4 border-black w-full max-w-2xl max-h-[90vh] overflow-y-auto neubrutal-shadow">
+              <div className="p-4 md:p-6 border-b-4 border-black flex justify-between items-center bg-tertiary-fixed sticky top-0 z-10">
+                <h2 className="font-display-bold text-xl md:text-2xl uppercase flex items-center gap-3">
+                  <span className="material-symbols-outlined text-3xl">info</span>
+                  Panduan Admin
+                </h2>
+                <button onClick={() => setShowGuideModal(false)} className="hover:text-error transition-colors">
+                  <span className="material-symbols-outlined text-3xl">close</span>
+                </button>
+              </div>
+              <div className="p-4 md:p-6 space-y-6">
+                <div className="space-y-3">
+                  <h3 className="font-headline-md uppercase text-primary flex items-center gap-2">
+                    <span className="material-symbols-outlined">person_add</span>
+                    Tambah Warga
+                  </h3>
+                  <p className="font-body-md text-sm text-zinc-600">
+                    Klik tombol "Tambah Warga" untuk menambahkan data warga baru. Isi form dengan lengkap termasuk nama, NIK, nomor KK, dan data anggota keluarga.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <h3 className="font-headline-md uppercase text-primary flex items-center gap-2">
+                    <span className="material-symbols-outlined">upload_file</span>
+                    Import Excel
+                  </h3>
+                  <p className="font-body-md text-sm text-zinc-600">
+                    Gunakan fitur import untuk menambahkan banyak data sekaligus dari file Excel. Format kolom: Nama, NIK, Nomor KK, Alamat, Telepon.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <h3 className="font-headline-md uppercase text-primary flex items-center gap-2">
+                    <span className="material-symbols-outlined">search</span>
+                    Pencarian
+                  </h3>
+                  <p className="font-body-md text-sm text-zinc-600">
+                    Gunakan fitur pencarian untuk menemukan warga berdasarkan nama atau nomor KK. Filter status pembayaran untuk melihat warga yang sudah/belum bayar.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <h3 className="font-headline-md uppercase text-primary flex items-center gap-2">
+                    <span className="material-symbols-outlined">edit</span>
+                    Edit & Hapus
+                  </h3>
+                  <p className="font-body-md text-sm text-zinc-600">
+                    Klik tombol edit (ikon pensil) untuk mengubah data warga. Klik tombol hapus (ikon tempat sampah) untuk menghapus data warga beserta semua data iuran terkait.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <h3 className="font-headline-md uppercase text-primary flex items-center gap-2">
+                    <span className="material-symbols-outlined">download</span>
+                    Export Data
+                  </h3>
+                  <p className="font-body-md text-sm text-zinc-600">
+                    Klik tombol "Download .XLSX" untuk mengunduh laporan data warga dan iuran dalam format Excel untuk keperluan pelaporan bulanan RT.
+                  </p>
+                </div>
+
+                <div className="bg-tertiary-fixed/30 border-2 border-black p-4 mt-4">
+                  <p className="font-label-bold uppercase text-xs mb-2">Tips:</p>
+                  <ul className="font-body-md text-sm text-zinc-600 list-disc list-inside space-y-1">
+                    <li>Pastikan NIK dan Nomor KK diisi dengan benar (16 digit)</li>
+                    <li>Update data anggota keluarga secara berkala</li>
+                    <li>Periksa status pembayaran setiap awal bulan</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Export Pilihan Periode */}
+        {showExportModal && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white border-4 border-black w-full max-w-md neubrutal-shadow flex flex-col">
+              <div className="p-4 border-b-4 border-black flex justify-between items-center bg-tertiary-fixed text-black">
+                <h2 className="font-display-bold text-xl uppercase flex items-center gap-2">
+                  <span className="material-symbols-outlined">download</span>
+                  Export Laporan Warga
+                </h2>
+                <button onClick={() => setShowExportModal(false)} className="hover:text-error transition-colors">
+                  <span className="material-symbols-outlined text-3xl">close</span>
+                </button>
+              </div>
+              <form onSubmit={(e) => {
+                e.preventDefault()
+                const hasData = iuranData.some(i => i.bulan === parseInt(exportFilters.bulan) && i.tahun === parseInt(exportFilters.tahun))
+                if (!hasData) {
+                  setShowExportModal(false)
+                  setShowNoDataModal(true)
+                  return
+                }
+                generateExcelReport(wargaData, iuranData, exportFilters.bulan, exportFilters.tahun)
+                setShowExportModal(false)
+              }}>
+                <div className="p-6 space-y-4">
+                  <p className="text-xs font-bold text-zinc-600 uppercase bg-zinc-100 border-2 border-black p-3">
+                    Silakan pilih periode bulan dan tahun laporan warga yang ingin diekspor ke Excel.
+                  </p>
+                  <div>
+                    <label className="block font-label-bold uppercase mb-2">Pilih Bulan</label>
+                    <select
+                      required
+                      className="w-full border-4 border-black p-3 font-bold bg-white focus:ring-0 outline-none cursor-pointer"
+                      value={exportFilters.bulan}
+                      onChange={(e) => setExportFilters({...exportFilters, bulan: e.target.value})}
+                    >
+                      {[1,2,3,4,5,6,7,8,9,10,11,12].map(b => (
+                        <option key={b} value={b.toString()}>{getBulanName(b)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-label-bold uppercase mb-2">Pilih Tahun</label>
+                    <select
+                      required
+                      className="w-full border-4 border-black p-3 font-bold bg-white focus:ring-0 outline-none cursor-pointer"
+                      value={exportFilters.tahun}
+                      onChange={(e) => setExportFilters({...exportFilters, tahun: e.target.value})}
+                    >
+                      {[2024, 2025, 2026, 2027, 2028].map(y => (
+                        <option key={y} value={y.toString()}>{y}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="p-4 border-t-4 border-black bg-zinc-50 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowExportModal(false)}
+                    className="px-6 py-2 border-4 border-black font-label-bold uppercase hover:bg-white transition-colors"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2 bg-primary text-white border-4 border-black font-label-bold uppercase neubrutal-shadow active-press"
+                  >
+                    Export ke Excel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Peringatan Data Kosong */}
+        {showNoDataModal && (
+          <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white border-4 border-black w-full max-w-md neubrutal-shadow-lg flex flex-col overflow-hidden">
+              <div className="p-4 border-b-4 border-black flex justify-between items-center bg-error text-white">
+                <h2 className="font-display-bold text-xl uppercase flex items-center gap-2">
+                  <span className="material-symbols-outlined text-2xl animate-bounce">warning</span>
+                  Data Tidak Ditemukan!
+                </h2>
+                <button onClick={() => setShowNoDataModal(false)} className="hover:text-black transition-colors">
+                  <span className="material-symbols-outlined text-3xl">close</span>
+                </button>
+              </div>
+              <div className="p-6 text-center space-y-4">
+                <div className="w-16 h-16 bg-error-container border-4 border-black flex items-center justify-center mx-auto rounded-none neubrutal-shadow-sm">
+                  <span className="material-symbols-outlined text-4xl text-error">database_off</span>
+                </div>
+                <div>
+                  <h3 className="font-headline-md uppercase text-lg">Tidak Ada Data Tagihan</h3>
+                  <p className="text-sm font-body-md text-zinc-600 mt-2">
+                    Belum ada data tagihan warga yang dibuat untuk periode <b>{getBulanName(parseInt(exportFilters.bulan))} {exportFilters.tahun}</b>. Silakan buat tagihan terlebih dahulu di menu Kelola Iuran.
+                  </p>
+                </div>
+              </div>
+              <div className="p-4 border-t-4 border-black bg-zinc-50 flex flex-col sm:flex-row gap-3 justify-center">
+                <button 
+                  onClick={() => {
+                    setShowNoDataModal(false)
+                    setShowExportModal(true)
+                  }}
+                  className="flex-1 px-4 py-2 border-2 border-black bg-white font-label-bold uppercase neubrutal-shadow-sm hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all text-xs"
+                >
+                  Pilih Bulan Lain
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowNoDataModal(false)
+                    window.location.href = '/admin/iuran'
+                  }}
+                  className="flex-1 px-4 py-2 border-2 border-black bg-primary text-white font-label-bold uppercase neubrutal-shadow-sm hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all text-xs"
+                >
+                  Ke Kelola Iuran
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AdminLayout>
   )

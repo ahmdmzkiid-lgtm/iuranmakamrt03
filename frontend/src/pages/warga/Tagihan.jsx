@@ -40,13 +40,14 @@ export default function WargaTagihan() {
       
       const formatted = belumBayar.map((item) => ({
         id: item.id,
-        jenis: `Iuran Makam ${getBulanName(item.bulan)} ${item.tahun}`,
-        kategori: 'Iuran Makam',
+        tipe: item.tipe,
+        jenis: `${item.tipe === 'warga' ? 'Iuran Warga' : 'Iuran Makam'} ${getBulanName(item.bulan)} ${item.tahun}`,
+        kategori: item.tipe === 'warga' ? 'Iuran Warga' : 'Iuran Makam',
         nominal: Number(item.jumlah),
         jatuhTempo: `10 ${getBulanName(item.bulan).substring(0, 3)} ${item.tahun}`,
         status: item.status,
-        icon: 'deceased',
-        color: 'bg-white', // default color
+        icon: item.tipe === 'warga' ? 'groups' : 'deceased',
+        color: 'bg-white',
       }))
       
       setTagihanAktif(formatted)
@@ -71,9 +72,9 @@ export default function WargaTagihan() {
     .reduce((sum, t) => sum + t.nominal, 0)
 
   const isBayarAwal = tagihanAktif.length === 0
-  const jumlahMakam = profil?.jumlahMakam || 1
-  const sisaBulan = profil ? Math.max(0, 35 - profil.bulanTerbayar) : 35
-  const totalBayarAwal = jumlahBulanAwal * jumlahMakam * 10000
+  const [tipeAwal, setTipeAwal] = useState('warga')
+  const [nominalAwal, setNominalAwal] = useState('')
+  const totalBayarAwal = jumlahBulanAwal * (parseInt(nominalAwal) || 0)
 
   const total = isBayarAwal ? totalBayarAwal : totalBayarAktif
 
@@ -111,6 +112,8 @@ export default function WargaTagihan() {
 
       if (isBayarAwal) {
         formData.append('jumlahBulan', jumlahBulanAwal)
+        formData.append('tipe', tipeAwal)
+        formData.append('jumlah', nominalAwal)
         await api.post('/iuran/bayar-awal', formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         })
@@ -223,7 +226,7 @@ export default function WargaTagihan() {
             </div>
 
             {/* Bayar di Awal Section */}
-            {tagihanAktif.length === 0 && !loading && sisaBulan > 0 && (
+            {tagihanAktif.length === 0 && !loading && (
               <div className="bg-white border-4 border-black neubrutal-shadow-lg">
                 <div className="border-b-4 border-black p-4 bg-tertiary-fixed flex justify-between items-center">
                   <h2 className="font-headline-md uppercase flex items-center gap-2 text-sm md:text-base">
@@ -233,35 +236,49 @@ export default function WargaTagihan() {
                 </div>
                 <div className="p-4 md:p-md">
                   <p className="font-body-md text-sm mb-4">
-                    Anda tidak memiliki tagihan aktif. Namun, Anda dapat membayar iuran untuk bulan-bulan berikutnya di awal (Maksimal sisa {sisaBulan} bulan).
+                    Anda tidak memiliki tagihan aktif. Anda dapat membayar iuran untuk bulan-bulan berikutnya di awal.
                   </p>
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1">
-                      <label className="block font-label-bold uppercase mb-2 text-xs">Jumlah Bulan</label>
-                      <input 
-                        type="number" 
-                        min="1" 
-                        max={sisaBulan} 
-                        value={jumlahBulanAwal} 
-                        onChange={(e) => setJumlahBulanAwal(Math.min(sisaBulan, Math.max(1, parseInt(e.target.value) || 1)))}
-                        className="w-full px-4 py-3 border-4 border-black font-body-md focus:bg-tertiary-fixed focus:outline-none transition-colors" 
-                      />
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block font-label-bold uppercase mb-2 text-xs">Tipe Iuran</label>
+                      <select
+                        value={tipeAwal}
+                        onChange={(e) => setTipeAwal(e.target.value)}
+                        className="w-full px-4 py-3 border-4 border-black font-body-md focus:bg-tertiary-fixed focus:outline-none transition-colors"
+                      >
+                        <option value="warga">Iuran Bulanan Warga</option>
+                        <option value="makam">Iuran Makam Bulanan</option>
+                      </select>
                     </div>
-                    <div className="flex-1">
-                      <label className="block font-label-bold uppercase mb-2 text-xs">Total (Berdasarkan {jumlahMakam} Makam)</label>
-                      <p className="font-display-bold text-xl md:text-2xl pt-2">{formatRp(totalBayarAwal)}</p>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block font-label-bold uppercase mb-2 text-xs">Nominal (Rp)</label>
+                        <input 
+                          type="number" 
+                          min="1" 
+                          placeholder="50000"
+                          value={nominalAwal} 
+                          onChange={(e) => setNominalAwal(e.target.value)}
+                          className="w-full px-4 py-3 border-4 border-black font-body-md focus:bg-tertiary-fixed focus:outline-none transition-colors" 
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-label-bold uppercase mb-2 text-xs">Jumlah Bulan</label>
+                        <input 
+                          type="number" 
+                          min="1" 
+                          max={12} 
+                          value={jumlahBulanAwal} 
+                          onChange={(e) => setJumlahBulanAwal(Math.min(12, Math.max(1, parseInt(e.target.value) || 1)))}
+                          className="w-full px-4 py-3 border-4 border-black font-body-md focus:bg-tertiary-fixed focus:outline-none transition-colors" 
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-label-bold uppercase mb-2 text-xs">Total</label>
+                        <p className="font-display-bold text-xl md:text-2xl pt-2">{formatRp(totalBayarAwal)}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            )}
-            
-            {tagihanAktif.length === 0 && !loading && sisaBulan === 0 && (
-              <div className="bg-secondary-container border-4 border-black p-4 md:p-md neubrutal-shadow-lg flex items-center gap-4">
-                <span className="material-symbols-outlined text-4xl text-secondary">verified</span>
-                <div>
-                  <h2 className="font-headline-md uppercase text-secondary">Pelunasan Selesai</h2>
-                  <p className="font-body-md text-sm text-secondary-dim">Anda telah melunasi seluruh iuran 35 bulan.</p>
                 </div>
               </div>
             )}
@@ -441,7 +458,7 @@ export default function WargaTagihan() {
 
                 <button
                   onClick={handleBayar}
-                  disabled={(!isBayarAwal && selected.length === 0) || (isBayarAwal && sisaBulan === 0) || isSubmitting}
+                  disabled={(!isBayarAwal && selected.length === 0) || isSubmitting}
                   className="w-full mt-6 bg-primary text-white border-4 border-black p-4 font-display-bold uppercase text-sm md:text-base neubrutal-shadow-lg active:translate-x-1 active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:translate-x-0 disabled:active:translate-y-0"
                 >
                   <span className="material-symbols-outlined">account_balance_wallet</span>

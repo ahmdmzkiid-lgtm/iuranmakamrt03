@@ -1,30 +1,39 @@
-# Dependencies
+# Dependency folders
 node_modules/
 .pnp
 .pnp.js
 
-# Testing
-coverage/
-
-# Production
+# Build / Production artefacts
 dist/
 build/
+frontend/dist/
+frontend/build/
 
-# Misc
-.DS_Store
+# Environment / secrets (never commit)
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+*.local
+frontend/.env.production
+.env.production
+.env.test
+.env.development
 
-# Logs
+# Database / Prisma
+backend/prisma/migrations/
+*.sqlite
+
+# Log files
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+*.log
 
-# Editor folders
+# OS / editor artefacts
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
 .vscode/
 .idea/
 *.suo
@@ -32,6 +41,13 @@ pnpm-debug.log*
 *.njsproj
 *.sln
 *.sw?
+*.code-workspace
 
-# Prisma
-/backend/prisma/migrations/
+# Temporary / cache
+.tmp/
+.cache/
+coverage/
+
+# Misc (optional)
+.render.yaml
+.vercel.json

@@ -15,11 +15,15 @@ export default function WargaDashboard() {
   const [dataIuran, setDataIuran] = useState([])
   const [profil, setProfil] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [showSetupModal, setShowSetupModal] = useState(false)
-  const [savingSetup, setSavingSetup] = useState(false)
-  const [setupForm, setSetupForm] = useState({
-    almarhum: [{ nama: '', hubungan: '', tahunWafat: '' }]
-  })
+  const [showGuideModal, setShowGuideModal] = useState(false)
+
+  useEffect(() => {
+    const showGuide = localStorage.getItem('showUserGuide') === 'true'
+    if (showGuide) {
+      setShowGuideModal(true)
+      localStorage.removeItem('showUserGuide')
+    }
+  }, [])
 
   useEffect(() => {
     const fetchData = async () => {
@@ -34,12 +38,6 @@ export default function WargaDashboard() {
         if (resProfil.data.user?.nama) {
           localStorage.setItem('nama', resProfil.data.user.nama)
         }
-        if (resProfil.data.isFirstLogin) {
-          const count = resProfil.data.jumlahMakam || 1
-          const initialAlmarhum = Array.from({ length: count }, () => ({ nama: '', hubungan: '', tahunWafat: '' }))
-          setSetupForm({ almarhum: initialAlmarhum })
-          setShowSetupModal(true)
-        }
       } catch (error) {
         console.error('Failed to fetch data', error)
       } finally {
@@ -49,54 +47,18 @@ export default function WargaDashboard() {
     fetchData()
   }, [])
 
-  const handleSetupChange = (index, field, value) => {
-    const updated = [...setupForm.almarhum]
-    updated[index] = { ...updated[index], [field]: value }
-    setSetupForm({ almarhum: updated })
-  }
-
-  const addSetupAlmarhum = () => {
-    setSetupForm({ almarhum: [...setupForm.almarhum, { nama: '', hubungan: '', tahunWafat: '' }] })
-  }
-
-  const handleSaveSetup = async () => {
-    if (setupForm.almarhum.some(a => !a.nama)) {
-      alert('Mohon isi minimal nama almarhum/ah')
-      return
-    }
-    setSavingSetup(true)
-    try {
-      await api.put('/warga/me', {
-        alamat: profil.alamat,
-        telepon: profil.telepon,
-        jumlahMakam: profil.jumlahMakam || setupForm.almarhum.length,
-        daftarAlmarhum: setupForm.almarhum
-      })
-      setShowSetupModal(false)
-      // Refresh profil
-      const res = await api.get('/warga/me')
-      setProfil(res.data)
-    } catch (error) {
-      console.error('Failed to save setup', error)
-      alert('Gagal menyimpan data. Silakan coba lagi.')
-    } finally {
-      setSavingSetup(false)
-    }
-  }
-
   const belumBayar = dataIuran.filter(i => i.status === 'belum_bayar')
-  // Menghitung Sisa Tagihan Berdasarkan Jumlah Makam & Bulan Terbayar
-  const jumlahMakam = profil?.jumlahMakam || 1
-  const bulanTerbayar = profil?.bulanTerbayar || 0
-  const sisaBulan = Math.max(0, 35 - bulanTerbayar)
-  const totalTagihan = sisaBulan * jumlahMakam * 10000
+  const belumBayarWarga = belumBayar.filter(i => i.tipe === 'warga')
+  const belumBayarMakam = belumBayar.filter(i => i.tipe === 'makam')
+  const jumlahAnggota = Array.isArray(profil?.anggotaKeluarga) ? profil.anggotaKeluarga.length : 0
+  const totalBelumBayar = belumBayar.reduce((sum, i) => sum + Number(i.jumlah), 0)
   
   const riwayatLunas = dataIuran
     .filter(i => i.status === 'lunas' || i.status === 'pending')
     .slice(0, 3)
     .map(item => ({
       tanggal: item.tanggalBayar ? new Date(item.tanggalBayar).toLocaleDateString('id-ID') : '-',
-      deskripsi: `Iuran Makam ${getBulanName(item.bulan)}`,
+      deskripsi: `${item.tipe === 'warga' ? 'Iuran Warga' : 'Iuran Makam'} ${getBulanName(item.bulan)}`,
       metode: item.metode || '-',
       jumlah: formatRp(item.jumlah),
       status: item.status
@@ -124,24 +86,33 @@ export default function WargaDashboard() {
                 <div className="bg-white border-2 border-black px-3 md:px-4 py-1 font-label-bold uppercase text-[10px] md:text-xs">
                   Status Pembayaran
                 </div>
-                {totalTagihan > 0 ? (
+                {belumBayar.length > 0 ? (
                   <div className="bg-error text-white border-2 border-black px-3 md:px-4 py-1 font-label-bold uppercase text-[10px] md:text-xs">
-                    Belum Lunas ({sisaBulan} bulan x {jumlahMakam} makam)
+                    {belumBayar.length} Tagihan Belum Lunas
                   </div>
                 ) : (
                   <div className="bg-secondary text-white border-2 border-black px-3 md:px-4 py-1 font-label-bold uppercase text-[10px] md:text-xs">
-                    Lunas
+                    Semua Lunas
                   </div>
                 )}
               </div>
               <div className="mb-lg">
-                <h2 className="font-display-bold uppercase text-xs md:text-sm text-black">Total Sisa Tagihan</h2>
+                <h2 className="font-display-bold uppercase text-xs md:text-sm text-black">Total Tagihan Belum Bayar</h2>
                 <p className="font-display-bold text-4xl md:text-6xl mt-2 text-black">
-                  {loading ? '...' : formatRp(totalTagihan)}
+                  {loading ? '...' : formatRp(totalBelumBayar)}
                 </p>
-                <p className="text-sm font-black mt-2 uppercase text-black/70">
-                  (Berdasarkan sisa {sisaBulan} bulan untuk {jumlahMakam} makam)
-                </p>
+                <div className="flex flex-wrap gap-3 mt-2">
+                  {belumBayarWarga.length > 0 && (
+                    <span className="text-[10px] font-black uppercase bg-white/50 border border-black px-2 py-0.5">
+                      Iuran Warga: {belumBayarWarga.length} bln
+                    </span>
+                  )}
+                  {belumBayarMakam.length > 0 && (
+                    <span className="text-[10px] font-black uppercase bg-white/50 border border-black px-2 py-0.5">
+                      Iuran Makam: {belumBayarMakam.length} bln
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
             <button
@@ -164,12 +135,12 @@ export default function WargaDashboard() {
                 <p className="font-body-lg uppercase font-bold">{profil?.user?.nama || 'Nama Warga'}</p>
               </div>
               <div>
-                <p className="font-label-bold text-xs uppercase text-zinc-500">Iuran Perbulan</p>
-                <p className="font-body-lg">Rp 10.000 x {jumlahMakam} Makam</p>
+                <p className="font-label-bold text-xs uppercase text-zinc-500">Tagihan Belum Bayar</p>
+                <p className="font-body-lg">{belumBayar.length} tagihan</p>
               </div>
               <div>
-                <p className="font-label-bold text-xs uppercase text-zinc-500">Progress Pelunasan</p>
-                <p className="font-body-lg">Dibayar {bulanTerbayar} dari 35 Bulan</p>
+                <p className="font-label-bold text-xs uppercase text-zinc-500">Jumlah Anggota Keluarga</p>
+                <p className="font-body-lg">{jumlahAnggota} orang</p>
               </div>
               <div className="pt-4">
                 <button onClick={() => navigate('/warga/setelan')} className="w-full bg-tertiary-fixed text-black border-2 border-black py-2 font-label-bold uppercase neubrutal-shadow active:translate-y-1 active:shadow-none">
@@ -264,71 +235,114 @@ export default function WargaDashboard() {
         </div>
       </div>
 
-      {/* Mandatory First-Time Setup Modal */}
-      {showSetupModal && (
-        <div className="fixed inset-0 z-[100] bg-black bg-opacity-80 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white border-4 border-black p-6 md:p-8 max-w-2xl w-full neubrutal-shadow-lg max-h-[90vh] overflow-y-auto">
-            <div className="mb-6">
-              <h2 className="font-display-bold text-2xl md:text-3xl uppercase mb-2">Lengkapi Data Makam</h2>
-              <p className="text-zinc-600 text-sm">
-                Selamat datang! Sebagai penghuni baru, Anda diwajibkan mengisi daftar almarhum/almarhumah keluarga Anda untuk pendataan iuran makam.
-              </p>
+      {showGuideModal && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white border-4 border-black w-full max-w-2xl neubrutal-shadow-lg flex flex-col overflow-hidden animate-in zoom-in duration-200">
+            {/* Header */}
+            <div className="p-4 md:p-6 border-b-4 border-black flex justify-between items-center bg-tertiary-fixed text-black">
+              <h2 className="font-display-bold text-xl md:text-2xl uppercase flex items-center gap-3">
+                <span className="material-symbols-outlined text-3xl animate-bounce">explore</span>
+                Panduan Pemakaian Warga Baru
+              </h2>
+              <button 
+                onClick={() => setShowGuideModal(false)} 
+                className="hover:rotate-90 transition-transform duration-200 flex items-center justify-center border-2 border-black bg-white p-1 hover:bg-error hover:text-white"
+              >
+                <span className="material-symbols-outlined text-xl md:text-2xl">close</span>
+              </button>
             </div>
 
-            <div className="space-y-4 mb-8">
-              {setupForm.almarhum.map((a, idx) => (
-                <div key={idx} className="border-2 border-black p-4 bg-zinc-50">
-                  <p className="font-label-bold uppercase text-[10px] text-zinc-400 mb-3">Data Almarhum #{idx + 1}</p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="md:col-span-2">
-                      <label className="text-[10px] font-black uppercase mb-1 block">Nama Lengkap</label>
-                      <input 
-                        type="text" 
-                        value={a.nama}
-                        onChange={(e) => handleSetupChange(idx, 'nama', e.target.value)}
-                        placeholder="Contoh: Budi bin Ahmad"
-                        className="w-full border-2 border-black p-2 text-sm focus:bg-primary-fixed/10 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black uppercase mb-1 block">Hubungan</label>
-                      <input 
-                        type="text" 
-                        value={a.hubungan}
-                        onChange={(e) => handleSetupChange(idx, 'hubungan', e.target.value)}
-                        placeholder="Ayah/Ibu/Saudara"
-                        className="w-full border-2 border-black p-2 text-sm focus:bg-primary-fixed/10 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black uppercase mb-1 block">Tahun Wafat</label>
-                      <input 
-                        type="text" 
-                        value={a.tahunWafat}
-                        onChange={(e) => handleSetupChange(idx, 'tahunWafat', e.target.value)}
-                        placeholder="2024"
-                        className="w-full border-2 border-black p-2 text-sm focus:bg-primary-fixed/10 focus:outline-none"
-                      />
-                    </div>
+            {/* Content */}
+            <div className="p-6 md:p-8 space-y-6 max-h-[70vh] overflow-y-auto">
+              <div className="bg-secondary-container border-4 border-black p-4 mb-4 neubrutal-shadow-sm">
+                <p className="font-body-md text-sm md:text-base text-black">
+                  👋 <span className="font-display-bold uppercase">Selamat datang di Aplikasi Iuran Makam & RT 03!</span> <br />
+                  Akun Anda telah aman diaktifkan dengan password baru. Berikut adalah 4 langkah utama untuk mempermudah aktivitas Anda sebagai warga RT 03:
+                </p>
+              </div>
+
+              {/* Bento Grid Features */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Step 1 */}
+                <div className="border-4 border-black bg-white p-4 neubrutal-shadow-sm flex gap-4 items-start hover:-translate-y-1 transition-all">
+                  <div className="bg-primary text-white border-2 border-black w-10 h-10 flex items-center justify-center shrink-0 font-display-bold text-lg">
+                    1
+                  </div>
+                  <div>
+                    <h3 className="font-headline-md uppercase text-sm mb-1 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-lg">account_balance_wallet</span>
+                      Cek & Bayar Tagihan
+                    </h3>
+                    <p className="text-xs text-zinc-600 font-bold uppercase leading-relaxed">
+                      Lihat rincian tagihan iuran warga atau makam yang belum dibayar secara transparan di dashboard utama.
+                    </p>
                   </div>
                 </div>
-              ))}
-              
+
+                {/* Step 2 */}
+                <div className="border-4 border-black bg-white p-4 neubrutal-shadow-sm flex gap-4 items-start hover:-translate-y-1 transition-all">
+                  <div className="bg-secondary text-white border-2 border-black w-10 h-10 flex items-center justify-center shrink-0 font-display-bold text-lg">
+                    2
+                  </div>
+                  <div>
+                    <h3 className="font-headline-md uppercase text-sm mb-1 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-lg">upload_file</span>
+                      Upload Bukti
+                    </h3>
+                    <p className="text-xs text-zinc-600 font-bold uppercase leading-relaxed">
+                      Setelah transfer bank, unggah struk/bukti transfer Anda agar Bendahara RT dapat segera memverifikasi.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Step 3 */}
+                <div className="border-4 border-black bg-white p-4 neubrutal-shadow-sm flex gap-4 items-start hover:-translate-y-1 transition-all">
+                  <div className="bg-[#ffae19] text-black border-2 border-black w-10 h-10 flex items-center justify-center shrink-0 font-display-bold text-lg">
+                    3
+                  </div>
+                  <div>
+                    <h3 className="font-headline-md uppercase text-sm mb-1 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-lg">download</span>
+                      Kuitansi Lunas
+                    </h3>
+                    <p className="text-xs text-zinc-600 font-bold uppercase leading-relaxed">
+                      Unduh kuitansi resmi berformat gambar/PDF kapan pun setelah pembayaran disetujui oleh Bendahara.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Step 4 */}
+                <div className="border-4 border-black bg-white p-4 neubrutal-shadow-sm flex gap-4 items-start hover:-translate-y-1 transition-all">
+                  <div className="bg-[#00f0ff] text-black border-2 border-black w-10 h-10 flex items-center justify-center shrink-0 font-display-bold text-lg">
+                    4
+                  </div>
+                  <div>
+                    <h3 className="font-headline-md uppercase text-sm mb-1 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-lg">groups</span>
+                      Kelola Keluarga
+                    </h3>
+                    <p className="text-xs text-zinc-600 font-bold uppercase leading-relaxed">
+                      Kelola dan perbarui data anggota keluarga yang terdaftar dalam Kartu Keluarga (KK) Anda dengan mudah.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <button
-              onClick={handleSaveSetup}
-              disabled={savingSetup}
-              className="w-full bg-primary text-white border-4 border-black p-4 font-display-bold uppercase text-lg neubrutal-shadow active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              {savingSetup ? 'Menyimpan...' : 'Simpan & Masuk ke Dashboard'}
-            </button>
-            <p className="text-[10px] text-center mt-4 text-zinc-400 uppercase font-bold">
-              Data ini diperlukan untuk validasi iuran tahunan makam RT.
-            </p>
+            {/* Footer */}
+            <div className="p-4 border-t-4 border-black bg-zinc-50 flex justify-end">
+              <button 
+                onClick={() => setShowGuideModal(false)}
+                className="w-full sm:w-auto px-6 py-3 border-4 border-black bg-primary text-white font-display-bold uppercase neubrutal-shadow active-press flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined">rocket_launch</span>
+                Mulai Jelajahi Aplikasi
+              </button>
+            </div>
           </div>
         </div>
       )}
+
     </WargaLayout>
   )
 }

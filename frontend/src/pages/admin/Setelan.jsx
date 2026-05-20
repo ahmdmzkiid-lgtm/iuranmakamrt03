@@ -13,7 +13,7 @@ export default function AdminSetelan() {
     bank_name: '',
     bank_account: '',
     bank_holder: '',
-    qris_url: ''
+    qris_url: '',
   })
   const [qrisFile, setQrisFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
@@ -26,7 +26,7 @@ export default function AdminSetelan() {
           bank_name: res.data.bank_name || '',
           bank_account: res.data.bank_account || '',
           bank_holder: res.data.bank_holder || '',
-          qris_url: res.data.qris_url || ''
+          qris_url: res.data.qris_url || '',
         })
         if (res.data.qris_url) {
           const qrisUrl = res.data.qris_url
@@ -147,6 +147,7 @@ export default function AdminSetelan() {
               </div>
             </div>
           </div>
+
 
           {/* QRIS Section */}
           <div className="bg-white border-4 border-black neubrutal-shadow-lg">

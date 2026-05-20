@@ -13,7 +13,7 @@ const getBulanName = (bln) => {
 const shortcuts = [
   { label: 'Kelola Warga', path: '/admin/warga', icon: 'groups', desc: 'Data & status penduduk', color: 'bg-white' },
   { label: 'Kelola Iuran', path: '/admin/iuran', icon: 'payments', desc: 'Tagihan & pembayaran', color: 'bg-secondary-container' },
-  { label: 'Kelola Makam', path: '/admin/makam', icon: 'church', desc: 'Data makam & almarhum', color: 'bg-primary-container', textColor: 'text-white' },
+  { label: 'Kelola Iuran', path: '/admin/makam', icon: 'tune', desc: 'Data makam & iuran', color: 'bg-primary-container', textColor: 'text-white' },
   { label: 'Setelan', path: '/admin/setelan', icon: 'settings', desc: 'Konfigurasi sistem', color: 'bg-tertiary-fixed' },
 ]
 
@@ -41,17 +41,26 @@ export default function AdminDashboard() {
 
   // Tagihan bulan ini
   const iuranBulanIni = dataIuran.filter(i => i.bulan === currentMonth && i.tahun === currentYear)
+  const iuranWargaBulanIni = iuranBulanIni.filter(i => i.tipe === 'warga')
+  const iuranMakamBulanIni = iuranBulanIni.filter(i => i.tipe === 'makam')
   const totalTerkumpulBulanIni = iuranBulanIni.filter(i => i.status === 'lunas').reduce((sum, i) => sum + Number(i.jumlah), 0)
   const estimasiBulanIni = iuranBulanIni.reduce((sum, i) => sum + Number(i.jumlah), 0)
   const persentase = estimasiBulanIni > 0 ? Math.round((totalTerkumpulBulanIni / estimasiBulanIni) * 100) : 0
   
+  const terkumpulWarga = iuranWargaBulanIni.filter(i => i.status === 'lunas').reduce((sum, i) => sum + Number(i.jumlah), 0)
+  const terkumpulMakam = iuranMakamBulanIni.filter(i => i.status === 'lunas').reduce((sum, i) => sum + Number(i.jumlah), 0)
+  const estimasiWarga = iuranWargaBulanIni.reduce((sum, i) => sum + Number(i.jumlah), 0)
+  const estimasiMakam = iuranMakamBulanIni.reduce((sum, i) => sum + Number(i.jumlah), 0)
+  const pctWarga = estimasiWarga > 0 ? Math.round((terkumpulWarga / estimasiWarga) * 100) : 0
+  const pctMakam = estimasiMakam > 0 ? Math.round((terkumpulMakam / estimasiMakam) * 100) : 0
+
   const pendingItems = dataIuran.filter(i => i.status === 'pending')
   const belumBayarBulanIni = iuranBulanIni.filter(i => i.status === 'belum_bayar')
 
-  const totalWarga = new Set(dataIuran.map(i => i.wargaId)).size // Estimasi dari iuran
+  const totalWarga = new Set(dataIuran.map(i => i.wargaId)).size
 
   const quickStats = [
-    { label: 'Total Warga (Aktif)', value: loading ? '...' : totalWarga.toString(), icon: 'groups', bg: 'bg-primary-container', text: 'text-white' },
+    { label: 'KK Aktif', value: loading ? '...' : totalWarga.toString(), icon: 'groups', bg: 'bg-primary-container', text: 'text-white' },
     { label: `Terkumpul ${getBulanName(currentMonth)}`, value: loading ? '...' : formatRp(totalTerkumpulBulanIni), icon: 'payments', bg: 'bg-secondary-container', text: 'text-black' },
     { label: 'Pending Verifikasi', value: loading ? '...' : pendingItems.length.toString(), icon: 'pending_actions', bg: 'bg-tertiary-fixed', text: 'text-black' },
     { label: 'Total Tagihan', value: loading ? '...' : formatRp(estimasiBulanIni), icon: 'receipt_long', bg: 'bg-white', text: 'text-black' },
@@ -62,7 +71,7 @@ export default function AdminDashboard() {
     .slice(0, 4)
     .map(i => ({
       waktu: i.tanggalBayar ? new Date(i.tanggalBayar).toLocaleDateString('id-ID') : '-',
-      judul: `${i.warga?.user?.nama || 'Warga'} membayar iuran`,
+      judul: `${i.warga?.user?.nama || 'Warga'} membayar ${i.tipe === 'warga' ? 'iuran warga' : 'iuran makam'}`,
       detail: `${formatRp(i.jumlah)} • ${i.metode || 'Transfer'}`
     }))
 
@@ -100,14 +109,39 @@ export default function AdminDashboard() {
             {/* Monthly Progress */}
             <div className="bg-white border-4 border-black p-4 md:p-6 neubrutal-shadow">
               <div className="flex justify-between items-end mb-4">
-                <h2 className="font-headline-md uppercase">Progress Iuran Makam {getBulanName(currentMonth)}</h2>
+                <h2 className="font-headline-md uppercase">Progress Iuran {getBulanName(currentMonth)}</h2>
                 <span className="font-display-bold text-2xl text-secondary">{loading ? '...' : `${persentase}%`}</span>
               </div>
-              <div className="w-full bg-zinc-200 border-2 border-black h-6">
-                <div className="bg-secondary h-full border-r-2 border-black transition-all duration-1000" style={{ width: `${persentase}%` }} />
+              {/* Iuran Warga Progress */}
+              <div className="mb-3">
+                <div className="flex justify-between mb-1">
+                  <span className="text-[10px] font-black uppercase text-zinc-500">Iuran Warga</span>
+                  <span className="text-[10px] font-black uppercase text-secondary">{pctWarga}%</span>
+                </div>
+                <div className="w-full bg-zinc-200 border-2 border-black h-4">
+                  <div className="bg-primary h-full border-r-2 border-black transition-all duration-1000" style={{ width: `${pctWarga}%` }} />
+                </div>
+                <div className="flex justify-between mt-1">
+                  <span className="text-[10px] font-bold text-zinc-400">{formatRp(terkumpulWarga)}</span>
+                  <span className="text-[10px] font-bold text-zinc-400">{formatRp(estimasiWarga)}</span>
+                </div>
               </div>
-              <div className="flex justify-between mt-2 flex-wrap gap-1">
-                <span className="text-xs font-bold uppercase text-zinc-500">{formatRp(totalTerkumpulBulanIni)} terkumpul</span>
+              {/* Iuran Makam Progress */}
+              <div className="mb-2">
+                <div className="flex justify-between mb-1">
+                  <span className="text-[10px] font-black uppercase text-zinc-500">Iuran Makam</span>
+                  <span className="text-[10px] font-black uppercase text-secondary">{pctMakam}%</span>
+                </div>
+                <div className="w-full bg-zinc-200 border-2 border-black h-4">
+                  <div className="bg-secondary h-full border-r-2 border-black transition-all duration-1000" style={{ width: `${pctMakam}%` }} />
+                </div>
+                <div className="flex justify-between mt-1">
+                  <span className="text-[10px] font-bold text-zinc-400">{formatRp(terkumpulMakam)}</span>
+                  <span className="text-[10px] font-bold text-zinc-400">{formatRp(estimasiMakam)}</span>
+                </div>
+              </div>
+              <div className="flex justify-between mt-2 flex-wrap gap-1 pt-2 border-t-2 border-dashed border-zinc-300">
+                <span className="text-xs font-bold uppercase text-zinc-500">{formatRp(totalTerkumpulBulanIni)} total terkumpul</span>
                 <span className="text-xs font-bold uppercase text-zinc-500">Target {formatRp(estimasiBulanIni)}</span>
               </div>
             </div>
@@ -173,10 +207,19 @@ export default function AdminDashboard() {
                 </div>
                 <div className="bg-white border-2 border-black p-3 flex justify-between items-center gap-2">
                   <div className="min-w-0">
-                    <p className="font-bold text-sm">{belumBayarBulanIni.length} Warga Belum Bayar</p>
-                    <p className="text-[10px] text-zinc-500 uppercase">Iuran {getBulanName(currentMonth)}</p>
+                    <p className="font-bold text-sm">{iuranWargaBulanIni.filter(i => i.status === 'belum_bayar').length} Belum Bayar Warga</p>
+                    <p className="text-[10px] text-zinc-500 uppercase">Iuran Warga {getBulanName(currentMonth)}</p>
                   </div>
                   <button className="bg-tertiary-fixed text-black border-2 border-black px-3 py-1 font-label-bold uppercase text-[10px] shrink-0">
+                    Ingatkan
+                  </button>
+                </div>
+                <div className="bg-white border-2 border-black p-3 flex justify-between items-center gap-2">
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm">{iuranMakamBulanIni.filter(i => i.status === 'belum_bayar').length} Belum Bayar Makam</p>
+                    <p className="text-[10px] text-zinc-500 uppercase">Iuran Makam {getBulanName(currentMonth)}</p>
+                  </div>
+                  <button className="bg-secondary text-white border-2 border-black px-3 py-1 font-label-bold uppercase text-[10px] shrink-0">
                     Ingatkan
                   </button>
                 </div>

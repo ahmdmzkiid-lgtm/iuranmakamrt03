@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import AdminLayout from '../../components/admin/AdminLayout'
 import api from '../../services/api'
 import { useNotification } from '../../context/NotificationContext'
@@ -19,13 +19,33 @@ export default function AdminIuran() {
   const [selectedBukti, setSelectedBukti] = useState(null)
   const [showRekamModal, setShowRekamModal] = useState(false)
   const [wargaList, setWargaList] = useState([])
-  const [rekamData, setRekamData] = useState({ wargaId: '', jumlahBulan: 1 })
+  const [rekamData, setRekamData] = useState({ wargaId: '', jumlahBulan: 1, tipe: 'warga', jumlah: '' })
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [rejectId, setRejectId] = useState(null)
   const [rejectReason, setRejectReason] = useState('')
   const [showGuideModal, setShowGuideModal] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [tipeFilter, setTipeFilter] = useState('SEMUA')
+  const [showGenerateModal, setShowGenerateModal] = useState(false)
+  const [generateData, setGenerateData] = useState({ tipe: 'warga', bulan: new Date().getMonth() + 1, tahun: new Date().getFullYear() })
+  const [wargaSearch, setWargaSearch] = useState('')
+  const [showWargaDropdown, setShowWargaDropdown] = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [exportFilters, setExportFilters] = useState({ bulan: 'SEMUA', tahun: new Date().getFullYear().toString() })
+  const [showNoDataModal, setShowNoDataModal] = useState(false)
+  const wargaDropdownRef = useRef(null)
   const { showAlert, showConfirm } = useNotification()
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (wargaDropdownRef.current && !wargaDropdownRef.current.contains(e.target)) {
+        setShowWargaDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const fetchData = async () => {
     try {
@@ -90,17 +110,19 @@ export default function AdminIuran() {
     }
   }
 
-  const handleGenerate = async () => {
-    if (!(await showConfirm('Buat tagihan bulan ini untuk semua warga?'))) return
+  const handleGenerate = async (e) => {
+    e.preventDefault()
+    if (!(await showConfirm(`Buat tagihan ${generateData.tipe === 'warga' ? 'Iuran Bulanan (Rp 10.000/KK)' : 'Iuran Makam (Rp 10.000 x jumlah orang)'} untuk SEMUA warga?`))) return
     try {
       setIsProcessing(true)
-      const d = new Date()
-      await api.post('/iuran/generate', { tahun: d.getFullYear(), bulan: d.getMonth() + 1 })
+      await api.post('/iuran/generate', generateData)
       await showAlert('Tagihan berhasil digenerate')
+      setShowGenerateModal(false)
+      setGenerateData({ tipe: 'warga', bulan: new Date().getMonth() + 1, tahun: new Date().getFullYear() })
       fetchData()
     } catch (error) {
       console.error('Generate error', error)
-      showAlert('Gagal generate tagihan')
+      showAlert(error.response?.data?.message || 'Gagal generate tagihan')
     } finally {
       setIsProcessing(false)
     }
@@ -130,7 +152,7 @@ export default function AdminIuran() {
       await api.post('/iuran/offline-advance', rekamData)
       await showAlert('Pembayaran offline berhasil dicatat')
       setShowRekamModal(false)
-      setRekamData({ wargaId: '', jumlahBulan: 1 })
+      setRekamData({ wargaId: '', jumlahBulan: 1, tipe: 'warga', jumlah: '' })
       fetchData()
     } catch (error) {
       console.error('Rekam bayar error', error)
@@ -159,7 +181,33 @@ export default function AdminIuran() {
       showAlert('Tidak ada data untuk diekspor')
       return
     }
-    generateTransactionReport(dataIuran)
+    // Set default export filters to the current month and year
+    const currentMonth = new Date().getMonth() + 1
+    setExportFilters({
+      bulan: currentMonth.toString(),
+      tahun: new Date().getFullYear().toString()
+    })
+    setShowExportModal(true)
+  }
+
+  const handleExportSubmit = (e) => {
+    e.preventDefault()
+    let filtered = [...dataIuran]
+    if (exportFilters.bulan !== 'SEMUA') {
+      filtered = filtered.filter(i => i.bulan === parseInt(exportFilters.bulan))
+    }
+    if (exportFilters.tahun !== 'SEMUA') {
+      filtered = filtered.filter(i => i.tahun === parseInt(exportFilters.tahun))
+    }
+    
+    if (filtered.length === 0) {
+      setShowExportModal(false)
+      setShowNoDataModal(true)
+      return
+    }
+    
+    generateTransactionReport(filtered, wargaList, exportFilters.bulan, exportFilters.tahun)
+    setShowExportModal(false)
   }
 
   const pendingItems = dataIuran.filter(i => i.status === 'pending')
@@ -173,7 +221,8 @@ export default function AdminIuran() {
     const itemPeriode = `${getBulanName(item.bulan)} ${item.tahun}`
     const matchPeriode = periode === 'SEMUA' || itemPeriode === periode
     const matchStatus = statusFilter === 'SEMUA' || item.status === statusFilter.toLowerCase()
-    return matchPeriode && matchStatus
+    const matchTipe = tipeFilter === 'SEMUA' || item.tipe === tipeFilter.toLowerCase()
+    return matchPeriode && matchStatus && matchTipe
   })
 
   // Grouping logic for table
@@ -218,12 +267,16 @@ export default function AdminIuran() {
             </p>
           </div>
           <div className="flex flex-wrap gap-4">
-            <button onClick={handleGenerate} disabled={isProcessing} className="bg-primary text-white border-4 border-black px-4 py-2 md:px-6 md:py-3 font-headline-md uppercase neubrutal-shadow active-press flex items-center gap-2 text-sm md:text-base disabled:opacity-50">
+            <button onClick={() => setShowGenerateModal(true)} disabled={isProcessing} className="bg-primary text-white border-4 border-black px-4 py-2 md:px-6 md:py-3 font-headline-md uppercase neubrutal-shadow active-press flex items-center gap-2 text-sm md:text-base disabled:opacity-50">
               <span className="material-symbols-outlined">add_card</span>
               Buat Tagihan
             </button>
             <button 
-              onClick={() => setShowRekamModal(true)}
+              onClick={() => {
+                setShowRekamModal(true)
+                setWargaSearch('')
+                setRekamData({ wargaId: '', jumlahBulan: 1, tipe: 'warga', jumlah: '' })
+              }}
               className="bg-secondary-container text-black border-4 border-black px-4 py-2 md:px-6 md:py-3 font-headline-md uppercase neubrutal-shadow active-press flex items-center gap-2 text-sm md:text-base"
             >
               <span className="material-symbols-outlined">history_edu</span>
@@ -290,6 +343,24 @@ export default function AdminIuran() {
                     ))}
                   </div>
                 </div>
+                <div>
+                  <label className="block font-label-bold uppercase mb-1">Tipe Iuran</label>
+                  <div className="flex flex-wrap gap-2">
+                    {['SEMUA', 'WARGA', 'MAKAM'].map(tp => (
+                      <button
+                        key={tp}
+                        onClick={() => setTipeFilter(tp)}
+                        className={`px-3 py-2 border-2 border-black font-black text-[10px] uppercase transition-all ${
+                          tipeFilter === tp 
+                            ? 'bg-primary text-white neubrutal-shadow-sm translate-x-[2px] translate-y-[2px]' 
+                            : 'bg-white hover:bg-zinc-100'
+                        }`}
+                      >
+                        {tp}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div className="pt-4 border-t-2 border-black/10">
                   <button 
                     onClick={handleKirimPengingat}
@@ -347,7 +418,7 @@ export default function AdminIuran() {
                       </div>
                       <div>
                         <p className="font-headline-md leading-tight text-sm md:text-base">{item.warga?.user?.nama}</p>
-                        <p className="text-xs font-bold uppercase text-zinc-500">Iuran Makam {getBulanName(item.bulan)} {item.tahun}</p>
+                        <p className="text-xs font-bold uppercase text-zinc-500">{item.tipe === 'warga' ? 'Iuran Warga' : 'Iuran Makam'} {getBulanName(item.bulan)} {item.tahun}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
@@ -400,11 +471,11 @@ export default function AdminIuran() {
                   <thead className="bg-zinc-100 border-b-4 border-black">
                     <tr>
                       <th className="p-4 font-label-bold uppercase text-xs">Nama Warga</th>
+                      <th className="p-4 font-label-bold uppercase text-xs">Tipe</th>
                       <th className="p-4 font-label-bold uppercase text-xs">Periode</th>
                       <th className="p-4 font-label-bold uppercase text-xs">Jumlah</th>
                       <th className="p-4 font-label-bold uppercase text-xs">Metode</th>
                       <th className="p-4 font-label-bold uppercase text-xs">Status</th>
-                      <th className="p-4 font-label-bold uppercase text-xs">Jml Makam</th>
                       <th className="p-4 font-label-bold uppercase text-xs">Aksi</th>
                     </tr>
                   </thead>
@@ -417,6 +488,11 @@ export default function AdminIuran() {
                       transaksiData.map((row) => (
                         <tr key={row.id} className="border-b-2 border-black hover:bg-yellow-50">
                           <td className="p-4 font-bold text-sm">{row.warga?.user?.nama}</td>
+                          <td className="p-4">
+                            <span className={`inline-block px-2 py-0.5 border-2 border-black text-[10px] font-black uppercase ${row.tipe === 'warga' ? 'bg-primary-container text-white' : 'bg-tertiary-fixed text-black'}`}>
+                              {row.tipe === 'warga' ? 'Warga' : 'Makam'}
+                            </span>
+                          </td>
                           <td className="p-4 text-sm">{row.periodeDisplay || `${getBulanName(row.bulan)} ${row.tahun}`}</td>
                           <td className="p-4 font-bold text-sm">{formatRp(row.jumlah)}</td>
                           <td className="p-4">
@@ -444,9 +520,6 @@ export default function AdminIuran() {
                                 Belum
                               </span>
                             )}
-                          </td>
-                          <td className="p-4 text-center font-bold">
-                            {row.warga?.jumlahMakam || 1}
                           </td>
                           <td className="p-4 text-right">
                             {row.status === 'belum_bayar' && (
@@ -504,6 +577,90 @@ export default function AdminIuran() {
           </div>
         )}
 
+        {/* Modal Buat Tagihan Massal */}
+        {showGenerateModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white border-4 border-black w-full max-w-lg neubrutal-shadow flex flex-col">
+              <div className="p-4 border-b-4 border-black flex justify-between items-center bg-primary text-white">
+                <h2 className="font-display-bold text-xl uppercase">Buat Tagihan Massal</h2>
+                <button onClick={() => setShowGenerateModal(false)}>
+                  <span className="material-symbols-outlined text-3xl">close</span>
+                </button>
+              </div>
+              <form onSubmit={handleGenerate}>
+                <div className="p-6 space-y-4">
+                  <p className="text-xs font-bold text-zinc-500 uppercase bg-tertiary-fixed border-2 border-black p-3">
+                    Tagihan akan dibuat untuk SEMUA warga sekaligus.
+                  </p>
+                  <div>
+                    <label className="block font-label-bold uppercase mb-2">Tipe Iuran</label>
+                    <select
+                      required
+                      className="w-full border-4 border-black p-3 font-bold bg-white focus:ring-0 outline-none"
+                      value={generateData.tipe}
+                      onChange={(e) => setGenerateData({...generateData, tipe: e.target.value})}
+                    >
+                      <option value="warga">Iuran Bulanan Warga</option>
+                      <option value="makam">Iuran Makam Bulanan</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block font-label-bold uppercase mb-2">Bulan</label>
+                      <select
+                        required
+                        className="w-full border-4 border-black p-3 font-bold bg-white focus:ring-0 outline-none"
+                        value={generateData.bulan}
+                        onChange={(e) => setGenerateData({...generateData, bulan: parseInt(e.target.value)})}
+                      >
+                        {[1,2,3,4,5,6,7,8,9,10,11,12].map(b => (
+                          <option key={b} value={b}>{getBulanName(b)}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-label-bold uppercase mb-2">Tahun</label>
+                      <input
+                        type="number"
+                        required
+                        min="2020"
+                        max="2099"
+                        className="w-full border-4 border-black p-3 font-bold bg-white focus:ring-0 outline-none"
+                        value={generateData.tahun}
+                        onChange={(e) => setGenerateData({...generateData, tahun: parseInt(e.target.value)})}
+                      />
+                    </div>
+                  </div>
+                  <div className="bg-tertiary-fixed border-2 border-black p-3">
+                    <p className="text-xs font-bold uppercase">Nominal Otomatis:</p>
+                    <p className="text-sm mt-1">
+                      {generateData.tipe === 'warga' 
+                        ? '• Rp 10.000 per KK' 
+                        : '• Rp 10.000 × (Kepala Keluarga + Anggota)'}
+                    </p>
+                  </div>
+                </div>
+                <div className="p-4 border-t-4 border-black bg-white flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowGenerateModal(false)}
+                    className="px-6 py-2 border-4 border-black font-label-bold uppercase hover:bg-zinc-100 transition-colors"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isProcessing}
+                    className="px-6 py-2 bg-primary text-white border-4 border-black font-label-bold uppercase neubrutal-shadow active-press disabled:opacity-50"
+                  >
+                    {isProcessing ? 'Memproses...' : 'Generate Tagihan'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* Modal Rekam Bayar Offline */}
         {showRekamModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -516,18 +673,77 @@ export default function AdminIuran() {
               </div>
               <form onSubmit={handleRekamBayar}>
                 <div className="p-6 space-y-4">
-                  <div>
+                  <div className="relative" ref={wargaDropdownRef}>
                     <label className="block font-label-bold uppercase mb-2">Pilih Warga</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Ketik nama atau nomor KK..."
+                        className="w-full border-4 border-black p-3 font-bold bg-white focus:ring-0 outline-none"
+                        value={wargaSearch}
+                        onChange={(e) => {
+                          setWargaSearch(e.target.value)
+                          setShowWargaDropdown(true)
+                          if (!e.target.value) setRekamData({...rekamData, wargaId: ''})
+                        }}
+                        onFocus={() => setShowWargaDropdown(true)}
+                      />
+                      {rekamData.wargaId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setWargaSearch('')
+                            setRekamData({...rekamData, wargaId: ''})
+                          }}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-error"
+                        >
+                          <span className="material-symbols-outlined">close</span>
+                        </button>
+                      )}
+                    </div>
+                    {showWargaDropdown && (
+                      <div className="absolute z-50 w-full bg-white border-4 border-black border-t-0 max-h-48 overflow-y-auto">
+                        {wargaList
+                          .filter(w => {
+                            const search = wargaSearch.toLowerCase()
+                            return w.user?.nama?.toLowerCase().includes(search) || 
+                                   w.user?.nomorKK?.toLowerCase().includes(search)
+                          })
+                          .slice(0, 20)
+                          .map(w => (
+                            <div
+                              key={w.id}
+                              className="p-3 hover:bg-zinc-100 cursor-pointer border-b border-zinc-200 last:border-b-0"
+                              onClick={() => {
+                                setRekamData({...rekamData, wargaId: w.id})
+                                setWargaSearch(`${w.user?.nama} - ${w.user?.nomorKK}`)
+                                setShowWargaDropdown(false)
+                              }}
+                            >
+                              <p className="font-bold text-sm">{w.user?.nama}</p>
+                              <p className="text-xs text-zinc-500">{w.user?.nomorKK}</p>
+                            </div>
+                          ))}
+                        {wargaList.filter(w => {
+                          const search = wargaSearch.toLowerCase()
+                          return w.user?.nama?.toLowerCase().includes(search) || 
+                                 w.user?.nomorKK?.toLowerCase().includes(search)
+                        }).length === 0 && (
+                          <div className="p-3 text-center text-zinc-400 italic">Tidak ditemukan</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block font-label-bold uppercase mb-2">Tipe Iuran</label>
                     <select 
                       required
                       className="w-full border-4 border-black p-3 font-bold bg-white focus:ring-0 outline-none"
-                      value={rekamData.wargaId}
-                      onChange={(e) => setRekamData({...rekamData, wargaId: e.target.value})}
+                      value={rekamData.tipe}
+                      onChange={(e) => setRekamData({...rekamData, tipe: e.target.value})}
                     >
-                      <option value="">-- PILIH WARGA --</option>
-                      {wargaList.map(w => (
-                        <option key={w.id} value={w.id}>{w.user?.nama} - {w.user?.nomorKK}</option>
-                      ))}
+                      <option value="warga">Iuran Bulanan Warga</option>
+                      <option value="makam">Iuran Makam Bulanan</option>
                     </select>
                   </div>
                   <div>
@@ -543,6 +759,18 @@ export default function AdminIuran() {
                     <p className="text-xs font-bold text-zinc-500 mt-2 uppercase">
                       * Pembayaran akan melunaskan tagihan lama yang belum bayar, lalu sisa bulannya akan menjadi tagihan baru di masa depan.
                     </p>
+                  </div>
+                  <div>
+                    <label className="block font-label-bold uppercase mb-2">Nominal per Bulan (Rp)</label>
+                    <input 
+                      type="number"
+                      min="1"
+                      required
+                      placeholder="Contoh: 50000"
+                      className="w-full border-4 border-black p-3 font-bold bg-white focus:ring-0 outline-none"
+                      value={rekamData.jumlah}
+                      onChange={(e) => setRekamData({...rekamData, jumlah: e.target.value})}
+                    />
                   </div>
                 </div>
                 <div className="p-4 border-t-4 border-black bg-white flex justify-end gap-3">
@@ -662,8 +890,123 @@ export default function AdminIuran() {
                 <button 
                   onClick={() => setShowGuideModal(false)}
                   className="px-8 py-3 bg-black text-white border-4 border-black font-label-bold uppercase neubrutal-shadow active-press"
-                >
+                 >
                   Saya Mengerti
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Export Pilihan Periode */}
+        {showExportModal && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white border-4 border-black w-full max-w-md neubrutal-shadow flex flex-col">
+              <div className="p-4 border-b-4 border-black flex justify-between items-center bg-tertiary-fixed text-black">
+                <h2 className="font-display-bold text-xl uppercase flex items-center gap-2">
+                  <span className="material-symbols-outlined">download</span>
+                  Export Laporan
+                </h2>
+                <button onClick={() => setShowExportModal(false)} className="hover:text-error transition-colors">
+                  <span className="material-symbols-outlined text-3xl">close</span>
+                </button>
+              </div>
+              <form onSubmit={handleExportSubmit}>
+                <div className="p-6 space-y-4">
+                  <p className="text-xs font-bold text-zinc-600 uppercase bg-zinc-100 border-2 border-black p-3">
+                    Silakan pilih periode bulan dan tahun data iuran yang ingin diekspor ke Excel.
+                  </p>
+                  <div>
+                    <label className="block font-label-bold uppercase mb-2">Pilih Bulan</label>
+                    <select
+                      required
+                      className="w-full border-4 border-black p-3 font-bold bg-white focus:ring-0 outline-none cursor-pointer"
+                      value={exportFilters.bulan}
+                      onChange={(e) => setExportFilters({...exportFilters, bulan: e.target.value})}
+                    >
+                      <option value="SEMUA">Semua Bulan (Keseluruhan)</option>
+                      {[1,2,3,4,5,6,7,8,9,10,11,12].map(b => (
+                        <option key={b} value={b.toString()}>{getBulanName(b)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-label-bold uppercase mb-2">Pilih Tahun</label>
+                    <select
+                      required
+                      className="w-full border-4 border-black p-3 font-bold bg-white focus:ring-0 outline-none cursor-pointer"
+                      value={exportFilters.tahun}
+                      onChange={(e) => setExportFilters({...exportFilters, tahun: e.target.value})}
+                    >
+                      <option value="SEMUA">Semua Tahun</option>
+                      {[2024, 2025, 2026, 2027, 2028].map(y => (
+                        <option key={y} value={y.toString()}>{y}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="p-4 border-t-4 border-black bg-zinc-50 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowExportModal(false)}
+                    className="px-6 py-2 border-4 border-black font-label-bold uppercase hover:bg-white transition-colors"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2 bg-primary text-white border-4 border-black font-label-bold uppercase neubrutal-shadow active-press"
+                  >
+                    Export ke Excel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Peringatan Data Kosong */}
+        {showNoDataModal && (
+          <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white border-4 border-black w-full max-w-md neubrutal-shadow-lg flex flex-col overflow-hidden">
+              <div className="p-4 border-b-4 border-black flex justify-between items-center bg-error text-white">
+                <h2 className="font-display-bold text-xl uppercase flex items-center gap-2">
+                  <span className="material-symbols-outlined text-2xl animate-bounce">warning</span>
+                  Data Tidak Ditemukan!
+                </h2>
+                <button onClick={() => setShowNoDataModal(false)} className="hover:text-black transition-colors">
+                  <span className="material-symbols-outlined text-3xl">close</span>
+                </button>
+              </div>
+              <div className="p-6 text-center space-y-4">
+                <div className="w-16 h-16 bg-error-container border-4 border-black flex items-center justify-center mx-auto rounded-none neubrutal-shadow-sm">
+                  <span className="material-symbols-outlined text-4xl text-error">database_off</span>
+                </div>
+                <div>
+                  <h3 className="font-headline-md uppercase text-lg">Tidak Ada Data Transaksi</h3>
+                  <p className="text-sm font-body-md text-zinc-600 mt-2">
+                    Maaf, data transaksi iuran untuk periode <b>{exportFilters.bulan !== 'SEMUA' ? getBulanName(parseInt(exportFilters.bulan)) : ''} {exportFilters.tahun !== 'SEMUA' ? exportFilters.tahun : 'Keseluruhan'}</b> belum dibuat atau belum ada catatan pembayarannya.
+                  </p>
+                </div>
+              </div>
+              <div className="p-4 border-t-4 border-black bg-zinc-50 flex flex-col sm:flex-row gap-3 justify-center">
+                <button 
+                  onClick={() => {
+                    setShowNoDataModal(false)
+                    setShowExportModal(true)
+                  }}
+                  className="flex-1 px-4 py-2 border-2 border-black bg-white font-label-bold uppercase neubrutal-shadow-sm hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all text-xs"
+                >
+                  Pilih Bulan Lain
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowNoDataModal(false)
+                    setShowGenerateModal(true)
+                  }}
+                  className="flex-1 px-4 py-2 border-2 border-black bg-primary text-white font-label-bold uppercase neubrutal-shadow-sm hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all text-xs"
+                >
+                  Buat Tagihan Baru
                 </button>
               </div>
             </div>
