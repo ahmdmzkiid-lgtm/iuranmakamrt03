@@ -19,7 +19,6 @@ frontend/.env.production
 .env.development
 
 # Database / Prisma
-backend/prisma/migrations/
 *.sqlite
 
 # Log files
