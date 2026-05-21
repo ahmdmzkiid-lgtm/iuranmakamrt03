@@ -45,7 +45,7 @@ router.get('/me', verifyToken, async (req, res) => {
 
 router.put('/me', verifyToken, async (req, res) => {
   try {
-    const { nama, alamat, telepon, jumlahMakam, anggotaKeluarga } = req.body
+    const { nama, alamat, telepon, anggotaKeluarga } = req.body
     
     // Update User Nama first if provided
     if (nama) {
