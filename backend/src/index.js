@@ -12,7 +12,6 @@ import iuranRoutes from './routes/iuran.js'
 import laporanRoutes from './routes/laporan.js'
 import settingsRoutes from './routes/settings.js'
 import notificationsRoutes from './routes/notifications.js'
-import cronRoutes from './routes/cron.js'
 
 dotenv.config()
 
@@ -58,10 +57,13 @@ app.use('/iuran', iuranRoutes)
 app.use('/laporan', laporanRoutes)
 app.use('/settings', settingsRoutes)
 app.use('/notifications', notificationsRoutes)
-app.use('/api', cronRoutes)
 
 app.get('/', (_req, res) => {
   res.status(200).send("OK")
+})
+
+app.get('/ping', (req, res) => {
+  res.status(200).send('pong')
 })
 
 const initDB = async () => {
