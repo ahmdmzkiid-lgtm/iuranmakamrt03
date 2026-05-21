@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 const navItems = [
@@ -27,6 +28,18 @@ export default function AdminLayout({ children, activeLabel = 'Dashboard' }) {
   const navigate = useNavigate()
 
   const isActive = (path) => location.pathname === path
+
+  // Guard: redirect ke login jika tidak ada token atau bukan admin
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    const role = localStorage.getItem('role')
+    if (!token || role !== 'admin') {
+      localStorage.removeItem('token')
+      localStorage.removeItem('role')
+      localStorage.removeItem('nama')
+      navigate('/', { replace: true })
+    }
+  }, [navigate])
 
   const handleLogout = () => {
     localStorage.removeItem('token')

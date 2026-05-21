@@ -25,6 +25,18 @@ export default function WargaLayout({ children }) {
 
   const isActive = (path) => location.pathname === path
 
+  // Guard: redirect ke login jika tidak ada token atau bukan warga
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    const role = localStorage.getItem('role')
+    if (!token || role !== 'warga') {
+      localStorage.removeItem('token')
+      localStorage.removeItem('role')
+      localStorage.removeItem('nama')
+      navigate('/', { replace: true })
+    }
+  }, [navigate])
+
   const isMobileActive = (path) => {
     if (path === '/warga/setelan') {
       return ['/warga/setelan', '/warga/riwayat', '/warga/kuitansi', '/warga/ubah-password'].includes(location.pathname)

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import { useNotification } from '../context/NotificationContext'
@@ -10,6 +10,19 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const { showAlert } = useNotification()
+
+  // Auto-redirect jika token masih ada di localStorage
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    const role = localStorage.getItem('role')
+    if (token && role) {
+      if (role === 'admin') {
+        navigate('/admin', { replace: true })
+      } else if (role === 'warga') {
+        navigate('/warga', { replace: true })
+      }
+    }
+  }, [navigate])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
