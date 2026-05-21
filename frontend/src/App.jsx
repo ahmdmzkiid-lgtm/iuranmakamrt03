@@ -14,6 +14,7 @@ import WargaMakam from './pages/warga/Makam'
 import WargaRiwayat from './pages/warga/Riwayat'
 import WargaUbahPassword from './pages/warga/UbahPassword'
 import AdminSetelan from './pages/admin/Setelan'
+import AdminNotifikasi from './pages/admin/Notifikasi'
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
         <Route path="/admin/iuran" element={<AdminIuran />} />
         <Route path="/admin/laporan" element={<AdminLaporan />} />
         <Route path="/admin/setelan" element={<AdminSetelan />} />
+        <Route path="/admin/notifikasi" element={<AdminNotifikasi />} />
         <Route path="/warga" element={<WargaDashboard />} />
         <Route path="/warga/tagihan" element={<WargaTagihan />} />
         <Route path="/warga/riwayat" element={<WargaRiwayat />} />

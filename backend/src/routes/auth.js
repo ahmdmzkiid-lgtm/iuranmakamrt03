@@ -93,6 +93,17 @@ router.post('/change-password', verifyToken, async (req, res) => {
       }
     }
 
+    // Password baru tidak boleh sama dengan password default (nomor KK)
+    if (user.nomorKK && newPassword === user.nomorKK) {
+      return res.status(400).json({ message: 'Password baru tidak boleh sama dengan nomor KK' })
+    }
+
+    // Password baru tidak boleh sama dengan password lama
+    const sameAsOld = await bcrypt.compare(newPassword, user.password)
+    if (sameAsOld) {
+      return res.status(400).json({ message: 'Password baru tidak boleh sama dengan password lama' })
+    }
+
     // Hash new password and update
     const hashedPassword = await bcrypt.hash(newPassword, 10)
     await prisma.user.update({

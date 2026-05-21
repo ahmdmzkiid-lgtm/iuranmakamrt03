@@ -6,6 +6,7 @@ const navItems = [
   { label: 'Data Warga', path: '/admin/warga', icon: 'groups' },
   { label: 'Iuran', path: '/admin/iuran', icon: 'payments' },
   { label: 'Kelola Iuran', path: '/admin/makam', icon: 'tune' },
+  { label: 'Notifikasi', path: '/admin/notifikasi', icon: 'notifications_active' },
   { label: 'Setting', path: '/admin/setelan', icon: 'settings' },
 ]
 
@@ -17,15 +18,22 @@ const topNavItems = [
 ]
 
 const mobileNavItems = [
-  { label: 'Dash', path: '/admin', icon: 'dashboard' },
+  { label: 'Home', path: '/admin', icon: 'home' },
   { label: 'Warga', path: '/admin/warga', icon: 'groups' },
   { label: 'Iuran', path: '/admin/iuran', icon: 'payments' },
-  { label: 'Kelola', path: '/admin/makam', icon: 'tune' },
+  { label: 'Menu', path: null, icon: 'menu', isMenu: true },
+]
+
+const moreMenuItems = [
+  { label: 'Kelola Iuran', path: '/admin/makam', icon: 'tune' },
+  { label: 'Notifikasi', path: '/admin/notifikasi', icon: 'notifications_active' },
+  { label: 'Setting', path: '/admin/setelan', icon: 'settings' },
 ]
 
 export default function AdminLayout({ children, activeLabel = 'Dashboard' }) {
   const location = useLocation()
   const navigate = useNavigate()
+  const [showMobileMenu, setShowMobileMenu] = useState(false)
 
   const isActive = (path) => location.pathname === path
 
@@ -137,23 +145,89 @@ export default function AdminLayout({ children, activeLabel = 'Dashboard' }) {
       {/* Mobile Bottom Nav */}
       <nav className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t-4 border-black z-50 flex justify-around items-center h-20 px-2 shadow-[0px_-4px_0px_0px_rgba(0,0,0,1)]">
         {mobileNavItems.map((item) => (
-          <Link
-            key={item.path}
-            to={item.path}
-            className={`flex flex-col items-center gap-1 transition-all p-2 ${
-              isActive(item.path) ? 'text-primary' : 'text-black'
-            }`}
-          >
-            <span
-              className="material-symbols-outlined"
-              style={isActive(item.path) ? { fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24" } : {}}
+          item.isMenu ? (
+            <button
+              key="menu"
+              onClick={() => setShowMobileMenu(true)}
+              className={`flex flex-col items-center gap-1 transition-all p-2 ${
+                showMobileMenu || moreMenuItems.some(m => isActive(m.path)) ? 'text-primary' : 'text-black'
+              }`}
             >
-              {item.icon}
-            </span>
-            <span className="text-[10px] font-black uppercase">{item.label}</span>
-          </Link>
+              <span
+                className="material-symbols-outlined"
+                style={showMobileMenu || moreMenuItems.some(m => isActive(m.path)) ? { fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24" } : {}}
+              >
+                {item.icon}
+              </span>
+              <span className="text-[10px] font-black uppercase">{item.label}</span>
+            </button>
+          ) : (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`flex flex-col items-center gap-1 transition-all p-2 ${
+                isActive(item.path) ? 'text-primary' : 'text-black'
+              }`}
+            >
+              <span
+                className="material-symbols-outlined"
+                style={isActive(item.path) ? { fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24" } : {}}
+              >
+                {item.icon}
+              </span>
+              <span className="text-[10px] font-black uppercase">{item.label}</span>
+            </Link>
+          )
         ))}
       </nav>
+
+      {/* Mobile Menu Drawer */}
+      {showMobileMenu && (
+        <div className="md:hidden fixed inset-0 z-[60]">
+          <div 
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowMobileMenu(false)}
+          />
+          <div className="absolute bottom-0 left-0 right-0 bg-white border-t-4 border-black rounded-t-2xl animate-slide-up">
+            <div className="p-4 border-b-2 border-black flex justify-between items-center">
+              <h3 className="font-headline-md uppercase">Menu Lainnya</h3>
+              <button 
+                onClick={() => setShowMobileMenu(false)}
+                className="p-2 hover:bg-zinc-100 rounded-full"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="p-4 space-y-2">
+              {moreMenuItems.map((item) => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => setShowMobileMenu(false)}
+                  className={`flex items-center gap-4 p-4 border-2 border-black transition-all ${
+                    isActive(item.path)
+                      ? 'bg-primary text-white'
+                      : 'bg-white hover:bg-zinc-100'
+                  }`}
+                >
+                  <span className="material-symbols-outlined">{item.icon}</span>
+                  <span className="font-label-bold uppercase">{item.label}</span>
+                </Link>
+              ))}
+              <button
+                onClick={() => {
+                  setShowMobileMenu(false)
+                  handleLogout()
+                }}
+                className="w-full flex items-center gap-4 p-4 border-2 border-black bg-error-container hover:bg-error hover:text-white transition-all"
+              >
+                <span className="material-symbols-outlined">logout</span>
+                <span className="font-label-bold uppercase">Logout</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )
