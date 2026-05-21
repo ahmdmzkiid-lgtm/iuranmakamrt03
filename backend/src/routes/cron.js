@@ -6,11 +6,12 @@ const router = Router()
 const prisma = new PrismaClient()
 
 const handleCleanup = (req, res) => {
-  // Send 200 OK immediately to close connection with cron-job.org instantly
-  res.status(200).end()
+  // 1. Kirim respon HTTP 200 dengan payload sekecil mungkin secepatnya agar cronjob.org tidak timeout
+  res.status(200).json({ success: true })
 
-  // Run the heavy database cleanup in the background
-  const runBackgroundCleanup = async () => {
+  // 2. Jalankan logika proses yang berat secara asynchronous di background menggunakan setImmediate
+  setImmediate(async () => {
+    // 3. Bungkus dengan try-catch agar error tidak membuat aplikasi crash
     try {
       // 1. Delete all Iuran records
       const dIuran = await prisma.iuran.deleteMany()
@@ -31,21 +32,13 @@ const handleCleanup = (req, res) => {
       // 5. Delete all Makam records
       const dMakam = await prisma.makam.deleteMany()
 
-      console.log('Cron Job Cleanup Successful!')
-      console.log({
-        iuran: dIuran.count,
-        warga: dWarga.count,
-        notifications: dNotification.count,
-        wargaUsers: dUser.count,
-        makam: dMakam.count
-      })
+      // Hemat Log: cetak log yang singkat dan padat dalam satu baris
+      console.log(`[Cron] Cleanup Success! Deleted: iuran(${dIuran.count}), warga(${dWarga.count}), notifications(${dNotification.count}), wargaUsers(${dUser.count}), makam(${dMakam.count})`)
     } catch (error) {
-      console.error('Error during database cleanup via cron in background:', error)
+      // Tangani error ke internal server log saja tanpa mengganggu respons / memicu crash
+      console.error('[Cron] Error during database cleanup in background:', error)
     }
-  }
-
-  // Fire and forget, executes in the background
-  runBackgroundCleanup()
+  })
 }
 
 // Support both GET and POST for cron-job.org
