@@ -1,4 +1,100 @@
-Setiap kali membuat atau memodifikasi route API untuk cronjob, 
-pastikan selalu respon HTTP akhirnya selalu berupa teks minimalis seperti res.send("OK") 
-dan JANGAN PERNAH mengembalikan payload data JSON yang besar untuk menghindari
-error payload limit/output terlalu besar pada pihak ketiga.
+# antigravityrules — Project Rules
+
+## Identitas Project
+- Runtime: Node.js + Express
+- Hosting: Render.com
+- Cron trigger: cron-job.org
+- Endpoint: https://iuranrt03-jvmr.onrender.com
+
+---
+
+## ATURAN WAJIB: Cron Job Endpoints
+
+### Response harus minimal
+Semua route yang di-hit cron-job.org WAJIB:
+- Return response MAKSIMAL 5KB
+- Format response: { status: "ok", timestamp: Date.now() }
+- HTTP status: 200
+
+### Pattern wajib (SELALU gunakan ini)
+app.get('/cron-endpoint', async (req, res) => {
+  res.status(200).json({ status: "ok" }) // response DULU
+  try {
+    await prosesBackground()             // proses BELAKANGAN
+  } catch (err) {
+    console.error('[CRON ERROR]', err)
+  }
+})
+
+### Yang DILARANG di cron routes
+- Jangan return array/list data besar
+- Jangan return hasil query database langsung
+- Jangan tunggu proses selesai sebelum res.send()
+- Jangan console.log di dalam response body
+- Jangan pakai res.json(queryResult) langsung
+
+---
+
+## ATURAN: Error Handling
+
+### Setiap async function wajib try-catch
+async function prosesData() {
+  try {
+    // logic di sini
+  } catch (err) {
+    console.error('[ERROR]', err.message)
+    // jangan throw ke atas kalau ini background process
+  }
+}
+
+### Jangan biarkan unhandled rejection
+process.on('unhandledRejection', (reason) => {
+  console.error('[UNHANDLED]', reason)
+})
+
+---
+
+## ATURAN: Logging
+
+- Semua log pakai prefix: [CRON], [ERROR], [INFO]
+- Log ke console saja, BUKAN ke response body
+- Jangan log objek besar (pakai .slice() atau summary saja)
+
+### Contoh log yang benar
+console.log('[CRON] Job mulai:', new Date().toISOString())
+console.log('[CRON] Selesai proses:', count, 'data')
+
+### Contoh log yang SALAH
+console.log(semuaData)         // ❌ terlalu besar
+res.json({ log: allLogs })     // ❌ masuk response
+
+---
+
+## ATURAN: Render.com Keep-Alive
+
+Render free tier sleep setelah 15 menit idle.
+Endpoint /ping wajib ada dan ringan:
+
+app.get('/ping', (req, res) => {
+  res.status(200).send('pong')
+})
+
+---
+
+## CHECKLIST sebelum deploy
+
+Sebelum push ke Render, Claude wajib verifikasi:
+- [ ] Semua cron route pakai pattern: res dulu, proses belakang
+- [ ] Tidak ada route yang return data > 5KB
+- [ ] Semua async pakai try-catch
+- [ ] /ping endpoint aktif
+- [ ] Tidak ada console.log di dalam res.json()
+
+---
+
+## Prioritas fix jika ada bug
+
+1. Cek apakah response size > 10KB → potong/pisahkan
+2. Cek apakah ada await sebelum res.send() → balik urutannya
+3. Cek apakah ada data besar masuk ke response → ganti dengan summary
+4. Cek middleware yang inject data ke response

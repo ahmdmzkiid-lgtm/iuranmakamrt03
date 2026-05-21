@@ -61,7 +61,7 @@ app.use('/notifications', notificationsRoutes)
 app.use('/api', cronRoutes)
 
 app.get('/', (_req, res) => {
-  res.json({ message: 'Iuran Makam RT API' })
+  res.status(200).send("OK")
 })
 
 const initDB = async () => {
