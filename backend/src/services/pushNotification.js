@@ -4,8 +4,22 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 // VAPID keys - simpan di .env untuk production
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BJLG2gJh0XFs1oOtudfNseNVZILb9lWDifQW_uzry6yebs55G6OSb5MCT9E0KTcgexS9LAKZeCaU0beluW2HxVY'
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '2fsKKJuMeO5gmI-Zj5iZ7zeUY9vmktp7_-YYhMYoxRY'
+const DEFAULT_PUBLIC_KEY = 'BJLG2gJh0XFs1oOtudfNseNVZILb9lWDifQW_uzry6yebs55G6OSb5MCT9E0KTcgexS9LAKZeCaU0beluW2HxVY'
+const DEFAULT_PRIVATE_KEY = '2fsKKJuMeO5gmI-Zj5iZ7zeUY9vmktp7_-YYhMYoxRY'
+
+let VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY ? process.env.VAPID_PUBLIC_KEY.replace(/['"]/g, '').trim() : ''
+let VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY ? process.env.VAPID_PRIVATE_KEY.replace(/['"]/g, '').trim() : ''
+
+// Validasi panjang kunci VAPID (Public: 87 char, Private: 43 char)
+if (!VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY.length !== 87) {
+  console.warn('VAPID_PUBLIC_KEY tidak valid atau tidak diatur. Menggunakan default key.')
+  VAPID_PUBLIC_KEY = DEFAULT_PUBLIC_KEY
+}
+
+if (!VAPID_PRIVATE_KEY || VAPID_PRIVATE_KEY.length !== 43) {
+  console.warn('VAPID_PRIVATE_KEY tidak valid atau tidak diatur. Menggunakan default key.')
+  VAPID_PRIVATE_KEY = DEFAULT_PRIVATE_KEY
+}
 
 webpush.setVapidDetails(
   'mailto:admin@iuranrt03.com',
