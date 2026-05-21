@@ -237,9 +237,9 @@ export default function WargaDashboard() {
 
       {showGuideModal && (
         <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white border-4 border-black w-full max-w-2xl neubrutal-shadow-lg flex flex-col overflow-hidden animate-in zoom-in duration-200">
+          <div className="bg-white border-4 border-black w-full max-w-2xl max-h-[90vh] neubrutal-shadow-lg flex flex-col overflow-hidden animate-in zoom-in duration-200">
             {/* Header */}
-            <div className="p-4 md:p-6 border-b-4 border-black flex justify-between items-center bg-tertiary-fixed text-black">
+            <div className="p-4 md:p-6 border-b-4 border-black flex justify-between items-center bg-tertiary-fixed text-black sticky top-0 z-10">
               <h2 className="font-display-bold text-xl md:text-2xl uppercase flex items-center gap-3">
                 <span className="material-symbols-outlined text-3xl animate-bounce">explore</span>
                 Panduan Pemakaian Warga Baru
@@ -253,7 +253,7 @@ export default function WargaDashboard() {
             </div>
 
             {/* Content */}
-            <div className="p-6 md:p-8 space-y-6 max-h-[70vh] overflow-y-auto">
+            <div className="p-6 md:p-8 space-y-6 flex-1 overflow-y-auto">
               <div className="bg-secondary-container border-4 border-black p-4 mb-4 neubrutal-shadow-sm">
                 <p className="font-body-md text-sm md:text-base text-black">
                   👋 <span className="font-display-bold uppercase">Selamat datang di Aplikasi Iuran Makam & RT 03!</span> <br />
@@ -330,7 +330,7 @@ export default function WargaDashboard() {
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t-4 border-black bg-zinc-50 flex justify-end">
+            <div className="p-4 border-t-4 border-black bg-zinc-50 flex justify-end sticky bottom-0 z-10">
               <button 
                 onClick={() => setShowGuideModal(false)}
                 className="w-full sm:w-auto px-6 py-3 border-4 border-black bg-primary text-white font-display-bold uppercase neubrutal-shadow active-press flex items-center justify-center gap-2"

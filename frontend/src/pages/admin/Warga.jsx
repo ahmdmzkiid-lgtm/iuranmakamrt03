@@ -225,7 +225,7 @@ export default function AdminWarga() {
         {/* Modal Tambah/Edit Warga */}
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white border-4 border-black w-full max-w-2xl max-h-[90vh] overflow-y-auto neubrutal-shadow flex flex-col">
+            <div className="bg-white border-4 border-black w-full max-w-2xl max-h-[90vh] neubrutal-shadow flex flex-col">
               <div className="p-4 md:p-6 border-b-4 border-black flex justify-between items-center bg-surface-bright sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl md:text-2xl uppercase">
                   {isEditing ? 'Edit Data Warga' : 'Tambah Warga Baru'}
@@ -234,8 +234,8 @@ export default function AdminWarga() {
                   <span className="material-symbols-outlined text-3xl">close</span>
                 </button>
               </div>
-              <div className="p-4 md:p-6">
-                <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+                <div className="p-4 md:p-6 space-y-4 flex-1 overflow-y-auto">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block font-label-bold uppercase mb-2">Nama Kepala Keluarga</label>
@@ -317,14 +317,14 @@ export default function AdminWarga() {
                     <label className="block font-label-bold uppercase mb-2">Bulan Terbayar Sebelumnya</label>
                     <input required type="number" min="0" max="35" name="bulanTerbayar" value={formData.bulanTerbayar} onChange={handleInputChange} className="w-full px-4 py-3 border-4 border-black font-body-md focus:bg-tertiary-fixed focus:outline-none transition-colors" />
                   </div>
-                  <div className="pt-4 flex justify-end gap-4">
-                    <button type="button" onClick={closeModal} className="px-6 py-3 border-4 border-black font-label-bold uppercase hover:bg-surface-variant transition-colors">Batal</button>
-                    <button type="submit" disabled={isSubmitting} className="px-6 py-3 bg-primary text-white border-4 border-black font-label-bold uppercase neubrutal-shadow active-press disabled:opacity-50">
-                      {isSubmitting ? 'Menyimpan...' : (isEditing ? 'Update Warga' : 'Simpan Warga')}
-                    </button>
-                  </div>
-                </form>
-              </div>
+                </div>
+                <div className="p-4 border-t-4 border-black bg-zinc-50 flex justify-end gap-4 sticky bottom-0 z-10">
+                  <button type="button" onClick={closeModal} className="px-6 py-3 border-4 border-black font-label-bold uppercase hover:bg-surface-variant transition-colors">Batal</button>
+                  <button type="submit" disabled={isSubmitting} className="px-6 py-3 bg-primary text-white border-4 border-black font-label-bold uppercase neubrutal-shadow active-press disabled:opacity-50">
+                    {isSubmitting ? 'Menyimpan...' : (isEditing ? 'Update Warga' : 'Simpan Warga')}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
@@ -332,14 +332,14 @@ export default function AdminWarga() {
         {/* Import Modal */}
         {showImportModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white border-4 border-black w-full max-w-3xl max-h-[90vh] overflow-y-auto neubrutal-shadow flex flex-col">
+            <div className="bg-white border-4 border-black w-full max-w-3xl max-h-[90vh] neubrutal-shadow flex flex-col">
               <div className="p-4 md:p-6 border-b-4 border-black flex justify-between items-center bg-surface-bright sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl md:text-2xl uppercase">Import Data Warga</h2>
                 <button onClick={() => setShowImportModal(false)} className="hover:text-error transition-colors">
                   <span className="material-symbols-outlined text-3xl">close</span>
                 </button>
               </div>
-              <div className="p-4 md:p-6 space-y-4">
+              <div className="p-4 md:p-6 space-y-4 flex-1 overflow-y-auto">
                 <div className="bg-tertiary-fixed border-4 border-black p-4">
                   <h3 className="font-label-bold uppercase text-xs mb-2">Format Kolom Excel</h3>
                   <p className="text-xs text-zinc-600 mb-2">File Excel harus memiliki kolom berikut di baris pertama (header):</p>
@@ -377,7 +377,7 @@ export default function AdminWarga() {
                         }
 
                         if (headerIdx === -1) {
-                          setImportResult({ message: 'Header tidak ditemukan. Pastikan ada kolom NO_KK dan NAMA_KK.', failed: 1, errors: [`Baris 1-10 tidak mengandung header NO_KK/NAMA_KK`] })
+                          setImportResult({ message: 'Header tidak ditemukan. Pastikan ada kolom NO_KK and NAMA_KK.', failed: 1, errors: [`Baris 1-10 tidak mengandung header NO_KK/NAMA_KK`] })
                           setImportData([])
                           return
                         }
@@ -475,28 +475,27 @@ export default function AdminWarga() {
                     )}
                   </div>
                 )}
-
-                <div className="flex justify-end gap-4 pt-2">
-                  <button type="button" onClick={() => setShowImportModal(false)} className="px-6 py-3 border-4 border-black font-label-bold uppercase hover:bg-surface-variant transition-colors">Batal</button>
-                  <button
-                    disabled={importData.length === 0 || importLoading}
-                    onClick={async () => {
-                      setImportLoading(true)
-                      try {
-                        const res = await api.post('/warga/import', { data: importData })
-                        setImportResult(res.data)
-                        if (res.data.success > 0) fetchWarga()
-                      } catch (err) {
-                        setImportResult({ message: err.response?.data?.error || 'Gagal import', failed: 1, errors: [] })
-                      } finally {
-                        setImportLoading(false)
-                      }
-                    }}
-                    className="px-6 py-3 bg-primary text-white border-4 border-black font-label-bold uppercase neubrutal-shadow active-press disabled:opacity-50"
-                  >
-                    {importLoading ? 'Mengimport...' : `Import ${importData.length} Data`}
-                  </button>
-                </div>
+              </div>
+              <div className="p-4 border-t-4 border-black bg-zinc-50 flex justify-end gap-4 sticky bottom-0 z-10">
+                <button type="button" onClick={() => setShowImportModal(false)} className="px-6 py-3 border-4 border-black font-label-bold uppercase hover:bg-surface-variant transition-colors">Batal</button>
+                <button
+                  disabled={importData.length === 0 || importLoading}
+                  onClick={async () => {
+                    setImportLoading(true)
+                    try {
+                      const res = await api.post('/warga/import', { data: importData })
+                      setImportResult(res.data)
+                      if (res.data.success > 0) fetchWarga()
+                    } catch (err) {
+                      setImportResult({ message: err.response?.data?.error || 'Gagal import', failed: 1, errors: [] })
+                    } finally {
+                      setImportLoading(false)
+                    }
+                  }}
+                  className="px-6 py-3 bg-primary text-white border-4 border-black font-label-bold uppercase neubrutal-shadow active-press disabled:opacity-50"
+                >
+                  {importLoading ? 'Mengimport...' : `Import ${importData.length} Data`}
+                </button>
               </div>
             </div>
           </div>
@@ -914,8 +913,8 @@ export default function AdminWarga() {
         {/* Modal Export Pilihan Periode */}
         {showExportModal && (
           <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white border-4 border-black w-full max-w-md neubrutal-shadow flex flex-col">
-              <div className="p-4 border-b-4 border-black flex justify-between items-center bg-tertiary-fixed text-black">
+            <div className="bg-white border-4 border-black w-full max-w-md max-h-[90vh] neubrutal-shadow flex flex-col">
+              <div className="p-4 border-b-4 border-black flex justify-between items-center bg-tertiary-fixed text-black sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl uppercase flex items-center gap-2">
                   <span className="material-symbols-outlined">download</span>
                   Export Laporan Warga
@@ -934,8 +933,8 @@ export default function AdminWarga() {
                 }
                 generateExcelReport(wargaData, iuranData, exportFilters.bulan, exportFilters.tahun)
                 setShowExportModal(false)
-              }}>
-                <div className="p-6 space-y-4">
+              }} className="flex flex-col flex-1 overflow-hidden">
+                <div className="p-6 space-y-4 flex-1 overflow-y-auto">
                   <p className="text-xs font-bold text-zinc-600 uppercase bg-zinc-100 border-2 border-black p-3">
                     Silakan pilih periode bulan dan tahun laporan warga yang ingin diekspor ke Excel.
                   </p>
@@ -966,7 +965,7 @@ export default function AdminWarga() {
                     </select>
                   </div>
                 </div>
-                <div className="p-4 border-t-4 border-black bg-zinc-50 flex justify-end gap-3">
+                <div className="p-4 border-t-4 border-black bg-zinc-50 flex justify-end gap-3 sticky bottom-0 z-10">
                   <button
                     type="button"
                     onClick={() => setShowExportModal(false)}
@@ -989,8 +988,8 @@ export default function AdminWarga() {
         {/* Modal Peringatan Data Kosong */}
         {showNoDataModal && (
           <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white border-4 border-black w-full max-w-md neubrutal-shadow-lg flex flex-col overflow-hidden">
-              <div className="p-4 border-b-4 border-black flex justify-between items-center bg-error text-white">
+            <div className="bg-white border-4 border-black w-full max-w-md max-h-[90vh] neubrutal-shadow-lg flex flex-col overflow-hidden">
+              <div className="p-4 border-b-4 border-black flex justify-between items-center bg-error text-white sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl uppercase flex items-center gap-2">
                   <span className="material-symbols-outlined text-2xl animate-bounce">warning</span>
                   Data Tidak Ditemukan!
@@ -999,7 +998,7 @@ export default function AdminWarga() {
                   <span className="material-symbols-outlined text-3xl">close</span>
                 </button>
               </div>
-              <div className="p-6 text-center space-y-4">
+              <div className="p-6 text-center space-y-4 flex-1 overflow-y-auto">
                 <div className="w-16 h-16 bg-error-container border-4 border-black flex items-center justify-center mx-auto rounded-none neubrutal-shadow-sm">
                   <span className="material-symbols-outlined text-4xl text-error">database_off</span>
                 </div>
@@ -1010,7 +1009,7 @@ export default function AdminWarga() {
                   </p>
                 </div>
               </div>
-              <div className="p-4 border-t-4 border-black bg-zinc-50 flex flex-col sm:flex-row gap-3 justify-center">
+              <div className="p-4 border-t-4 border-black bg-zinc-50 flex flex-col sm:flex-row gap-3 justify-center sticky bottom-0 z-10">
                 <button 
                   onClick={() => {
                     setShowNoDataModal(false)

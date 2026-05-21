@@ -628,24 +628,24 @@ const PAGE_TX_SIZE = 10;
         {/* Modal Lihat Bukti */}
         {selectedBukti && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white border-4 border-black w-full max-w-xl neubrutal-shadow flex flex-col">
-              <div className="p-4 border-b-4 border-black flex justify-between items-center bg-surface-bright">
+            <div className="bg-white border-4 border-black w-full max-w-xl neubrutal-shadow flex flex-col max-h-[90vh]">
+              <div className="p-4 border-b-4 border-black flex justify-between items-center bg-surface-bright sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl uppercase">Bukti Pembayaran</h2>
                 <button onClick={() => setSelectedBukti(null)} className="hover:text-error transition-colors">
                   <span className="material-symbols-outlined text-3xl">close</span>
                 </button>
               </div>
-              <div className="p-6 flex justify-center bg-zinc-100">
+              <div className="p-6 flex justify-center bg-zinc-100 flex-1 overflow-y-auto">
                 <img 
                   src={selectedBukti?.startsWith('http') ? selectedBukti : `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${selectedBukti}`} 
                   alt="Bukti Transfer" 
-                  className="max-h-[70vh] object-contain border-4 border-black shadow-lg"
+                  className="max-h-[50vh] md:max-h-[70vh] object-contain border-4 border-black shadow-lg"
                   onError={(e) => {
                     e.target.src = 'https://placehold.co/400x600?text=Bukti+Tidak+Ditemukan';
                   }}
                 />
               </div>
-              <div className="p-4 border-t-4 border-black bg-white flex justify-end">
+              <div className="p-4 border-t-4 border-black bg-white flex justify-end sticky bottom-0 z-10">
                 <button 
                   onClick={() => setSelectedBukti(null)}
                   className="px-6 py-2 border-4 border-black font-label-bold uppercase hover:bg-surface-variant transition-colors"
@@ -660,15 +660,15 @@ const PAGE_TX_SIZE = 10;
         {/* Modal Buat Tagihan Massal */}
         {showGenerateModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white border-4 border-black w-full max-w-lg neubrutal-shadow flex flex-col">
-              <div className="p-4 border-b-4 border-black flex justify-between items-center bg-primary text-white">
+            <div className="bg-white border-4 border-black w-full max-w-lg neubrutal-shadow flex flex-col max-h-[90vh]">
+              <div className="p-4 border-b-4 border-black flex justify-between items-center bg-primary text-white sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl uppercase">Buat Tagihan Massal</h2>
                 <button onClick={() => setShowGenerateModal(false)}>
                   <span className="material-symbols-outlined text-3xl">close</span>
                 </button>
               </div>
-              <form onSubmit={handleGenerate}>
-                <div className="p-6 space-y-4">
+              <form onSubmit={handleGenerate} className="flex flex-col flex-1 overflow-hidden">
+                <div className="p-6 space-y-4 flex-1 overflow-y-auto">
                   <p className="text-xs font-bold text-zinc-500 uppercase bg-tertiary-fixed border-2 border-black p-3">
                     Tagihan akan dibuat untuk SEMUA warga sekaligus.
                   </p>
@@ -720,7 +720,7 @@ const PAGE_TX_SIZE = 10;
                     </p>
                   </div>
                 </div>
-                <div className="p-4 border-t-4 border-black bg-white flex justify-end gap-3">
+                <div className="p-4 border-t-4 border-black bg-white flex justify-end gap-3 sticky bottom-0 z-10">
                   <button
                     type="button"
                     onClick={() => setShowGenerateModal(false)}
@@ -744,15 +744,15 @@ const PAGE_TX_SIZE = 10;
         {/* Modal Rekam Bayar Offline */}
         {showRekamModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white border-4 border-black w-full max-w-lg neubrutal-shadow flex flex-col">
-              <div className="p-4 border-b-4 border-black flex justify-between items-center bg-secondary-container">
+            <div className="bg-white border-4 border-black w-full max-w-lg neubrutal-shadow flex flex-col max-h-[90vh]">
+              <div className="p-4 border-b-4 border-black flex justify-between items-center bg-secondary-container sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl uppercase">Rekam Bayar Offline</h2>
                 <button onClick={() => setShowRekamModal(false)} className="hover:text-error transition-colors">
                   <span className="material-symbols-outlined text-3xl">close</span>
                 </button>
               </div>
-              <form onSubmit={handleRekamBayar}>
-                <div className="p-6 space-y-4">
+              <form onSubmit={handleRekamBayar} className="flex flex-col flex-1 overflow-hidden">
+                <div className="p-6 space-y-4 flex-1 overflow-y-auto">
                   <div className="relative" ref={wargaDropdownRef}>
                     <label className="block font-label-bold uppercase mb-2">Pilih Warga</label>
                     <div className="relative">
@@ -853,7 +853,7 @@ const PAGE_TX_SIZE = 10;
                     />
                   </div>
                 </div>
-                <div className="p-4 border-t-4 border-black bg-white flex justify-end gap-3">
+                <div className="p-4 border-t-4 border-black bg-white flex justify-end gap-3 sticky bottom-0 z-10">
                   <button 
                     type="button"
                     onClick={() => setShowRekamModal(false)}
@@ -877,14 +877,14 @@ const PAGE_TX_SIZE = 10;
         {/* Modal Alasan Penolakan */}
         {showRejectModal && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-            <div className="bg-white border-4 border-black w-full max-w-md neubrutal-shadow-lg flex flex-col animate-in zoom-in-95 duration-200">
-              <div className="p-4 border-b-4 border-black flex justify-between items-center bg-error text-white">
+            <div className="bg-white border-4 border-black w-full max-w-md neubrutal-shadow-lg flex flex-col animate-in zoom-in-95 duration-200 max-h-[90vh]">
+              <div className="p-4 border-b-4 border-black flex justify-between items-center bg-error text-white sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl uppercase">Tolak Pembayaran</h2>
                 <button onClick={() => setShowRejectModal(false)}>
                   <span className="material-symbols-outlined text-3xl">close</span>
                 </button>
               </div>
-              <div className="p-6">
+              <div className="p-6 flex-1 overflow-y-auto">
                 <label className="block font-label-bold uppercase mb-2">Alasan Penolakan</label>
                 <textarea 
                   className="w-full border-4 border-black p-3 font-bold bg-white focus:ring-0 outline-none min-h-[120px] resize-none"
@@ -896,7 +896,7 @@ const PAGE_TX_SIZE = 10;
                   * Alasan ini akan muncul di notifikasi dan riwayat warga.
                 </p>
               </div>
-              <div className="p-4 border-t-4 border-black bg-zinc-50 flex justify-end gap-3">
+              <div className="p-4 border-t-4 border-black bg-zinc-50 flex justify-end gap-3 sticky bottom-0 z-10">
                 <button 
                   onClick={() => setShowRejectModal(false)}
                   className="px-6 py-2 border-4 border-black font-label-bold uppercase hover:bg-white transition-colors"
@@ -918,14 +918,14 @@ const PAGE_TX_SIZE = 10;
         {/* Modal Panduan Penggunaan */}
         {showGuideModal && (
           <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-            <div className="bg-white border-4 border-black w-full max-w-2xl max-h-[90vh] overflow-y-auto neubrutal-shadow-lg flex flex-col">
-              <div className="p-4 border-b-4 border-black flex justify-between items-center bg-tertiary-fixed">
+            <div className="bg-white border-4 border-black w-full max-w-2xl max-h-[90vh] neubrutal-shadow-lg flex flex-col">
+              <div className="p-4 border-b-4 border-black flex justify-between items-center bg-tertiary-fixed sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl uppercase">Panduan Pengelolaan Iuran</h2>
                 <button onClick={() => setShowGuideModal(false)}>
                   <span className="material-symbols-outlined text-3xl">close</span>
                 </button>
               </div>
-              <div className="p-6 space-y-6">
+              <div className="p-6 space-y-6 flex-1 overflow-y-auto">
                 <section>
                   <h3 className="font-headline-md text-primary mb-2 flex items-center gap-2">
                     <span className="material-symbols-outlined">download</span>
@@ -966,7 +966,7 @@ const PAGE_TX_SIZE = 10;
                   </p>
                 </section>
               </div>
-              <div className="p-4 border-t-4 border-black bg-zinc-50 flex justify-end">
+              <div className="p-4 border-t-4 border-black bg-zinc-50 flex justify-end sticky bottom-0 z-10">
                 <button 
                   onClick={() => setShowGuideModal(false)}
                   className="px-8 py-3 bg-black text-white border-4 border-black font-label-bold uppercase neubrutal-shadow active-press"
@@ -981,8 +981,8 @@ const PAGE_TX_SIZE = 10;
         {/* Modal Export Pilihan Periode */}
         {showExportModal && (
           <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white border-4 border-black w-full max-w-md neubrutal-shadow flex flex-col">
-              <div className="p-4 border-b-4 border-black flex justify-between items-center bg-tertiary-fixed text-black">
+            <div className="bg-white border-4 border-black w-full max-w-md neubrutal-shadow flex flex-col max-h-[90vh]">
+              <div className="p-4 border-b-4 border-black flex justify-between items-center bg-tertiary-fixed text-black sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl uppercase flex items-center gap-2">
                   <span className="material-symbols-outlined">download</span>
                   Export Laporan
@@ -991,8 +991,8 @@ const PAGE_TX_SIZE = 10;
                   <span className="material-symbols-outlined text-3xl">close</span>
                 </button>
               </div>
-              <form onSubmit={handleExportSubmit}>
-                <div className="p-6 space-y-4">
+              <form onSubmit={handleExportSubmit} className="flex flex-col flex-1 overflow-hidden">
+                <div className="p-6 space-y-4 flex-1 overflow-y-auto">
                   <p className="text-xs font-bold text-zinc-600 uppercase bg-zinc-100 border-2 border-black p-3">
                     Silakan pilih periode bulan dan tahun data iuran yang ingin diekspor ke Excel.
                   </p>
@@ -1025,7 +1025,7 @@ const PAGE_TX_SIZE = 10;
                     </select>
                   </div>
                 </div>
-                <div className="p-4 border-t-4 border-black bg-zinc-50 flex justify-end gap-3">
+                <div className="p-4 border-t-4 border-black bg-zinc-50 flex justify-end gap-3 sticky bottom-0 z-10">
                   <button
                     type="button"
                     onClick={() => setShowExportModal(false)}
@@ -1048,8 +1048,8 @@ const PAGE_TX_SIZE = 10;
         {/* Modal Peringatan Data Kosong */}
         {showNoDataModal && (
           <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white border-4 border-black w-full max-w-md neubrutal-shadow-lg flex flex-col overflow-hidden">
-              <div className="p-4 border-b-4 border-black flex justify-between items-center bg-error text-white">
+            <div className="bg-white border-4 border-black w-full max-w-md neubrutal-shadow-lg flex flex-col max-h-[90vh]">
+              <div className="p-4 border-b-4 border-black flex justify-between items-center bg-error text-white sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl uppercase flex items-center gap-2">
                   <span className="material-symbols-outlined text-2xl animate-bounce">warning</span>
                   Data Tidak Ditemukan!
@@ -1058,7 +1058,7 @@ const PAGE_TX_SIZE = 10;
                   <span className="material-symbols-outlined text-3xl">close</span>
                 </button>
               </div>
-              <div className="p-6 text-center space-y-4">
+              <div className="p-6 text-center space-y-4 flex-1 overflow-y-auto">
                 <div className="w-16 h-16 bg-error-container border-4 border-black flex items-center justify-center mx-auto rounded-none neubrutal-shadow-sm">
                   <span className="material-symbols-outlined text-4xl text-error">database_off</span>
                 </div>
@@ -1069,13 +1069,13 @@ const PAGE_TX_SIZE = 10;
                   </p>
                 </div>
               </div>
-              <div className="p-4 border-t-4 border-black bg-zinc-50 flex flex-col sm:flex-row gap-3 justify-center">
+              <div className="p-4 border-t-4 border-black bg-zinc-50 flex flex-col sm:flex-row gap-3 justify-center sticky bottom-0 z-10">
                 <button 
                   onClick={() => {
                     setShowNoDataModal(false)
                     setShowExportModal(true)
                   }}
-                  className="flex-1 px-4 py-2 border-2 border-black bg-white font-label-bold uppercase neubrutal-shadow-sm hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all text-xs"
+                  className="flex-grow px-4 py-2 border-2 border-black bg-white font-label-bold uppercase neubrutal-shadow-sm hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all text-xs"
                 >
                   Pilih Bulan Lain
                 </button>
@@ -1084,7 +1084,7 @@ const PAGE_TX_SIZE = 10;
                     setShowNoDataModal(false)
                     setShowGenerateModal(true)
                   }}
-                  className="flex-1 px-4 py-2 border-2 border-black bg-primary text-white font-label-bold uppercase neubrutal-shadow-sm hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all text-xs"
+                  className="flex-grow px-4 py-2 border-2 border-black bg-primary text-white font-label-bold uppercase neubrutal-shadow-sm hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all text-xs"
                 >
                   Buat Tagihan Baru
                 </button>
