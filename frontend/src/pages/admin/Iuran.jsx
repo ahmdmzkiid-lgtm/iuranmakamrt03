@@ -627,8 +627,8 @@ const PAGE_TX_SIZE = 10;
 
         {/* Modal Lihat Bukti */}
         {selectedBukti && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white border-4 border-black w-full max-w-xl neubrutal-shadow flex flex-col max-h-[90vh]">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white border-4 border-black w-full max-w-xl neubrutal-shadow flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[85vh]">
               <div className="p-4 border-b-4 border-black flex justify-between items-center bg-surface-bright sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl uppercase">Bukti Pembayaran</h2>
                 <button onClick={() => setSelectedBukti(null)} className="hover:text-error transition-colors">
@@ -659,8 +659,8 @@ const PAGE_TX_SIZE = 10;
 
         {/* Modal Buat Tagihan Massal */}
         {showGenerateModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white border-4 border-black w-full max-w-lg neubrutal-shadow flex flex-col max-h-[90vh]">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white border-4 border-black w-full max-w-lg neubrutal-shadow flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[85vh]">
               <div className="p-4 border-b-4 border-black flex justify-between items-center bg-primary text-white sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl uppercase">Buat Tagihan Massal</h2>
                 <button onClick={() => setShowGenerateModal(false)}>
@@ -743,8 +743,8 @@ const PAGE_TX_SIZE = 10;
 
         {/* Modal Rekam Bayar Offline */}
         {showRekamModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white border-4 border-black w-full max-w-lg neubrutal-shadow flex flex-col max-h-[90vh]">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white border-4 border-black w-full max-w-lg neubrutal-shadow flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[85vh]">
               <div className="p-4 border-b-4 border-black flex justify-between items-center bg-secondary-container sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl uppercase">Rekam Bayar Offline</h2>
                 <button onClick={() => setShowRekamModal(false)} className="hover:text-error transition-colors">
@@ -877,7 +877,7 @@ const PAGE_TX_SIZE = 10;
         {/* Modal Alasan Penolakan */}
         {showRejectModal && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-            <div className="bg-white border-4 border-black w-full max-w-md neubrutal-shadow-lg flex flex-col animate-in zoom-in-95 duration-200 max-h-[90vh]">
+            <div className="bg-white border-4 border-black w-full max-w-md neubrutal-shadow-lg flex flex-col animate-in zoom-in-95 duration-200 max-h-[calc(100dvh-6rem)] md:max-h-[85vh]">
               <div className="p-4 border-b-4 border-black flex justify-between items-center bg-error text-white sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl uppercase">Tolak Pembayaran</h2>
                 <button onClick={() => setShowRejectModal(false)}>
@@ -917,8 +917,8 @@ const PAGE_TX_SIZE = 10;
 
         {/* Modal Panduan Penggunaan */}
         {showGuideModal && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-            <div className="bg-white border-4 border-black w-full max-w-2xl max-h-[90vh] neubrutal-shadow-lg flex flex-col">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+            <div className="bg-white border-4 border-black w-full max-w-2xl max-h-[calc(100dvh-6rem)] md:max-h-[85vh] neubrutal-shadow-lg flex flex-col">
               <div className="p-4 border-b-4 border-black flex justify-between items-center bg-tertiary-fixed sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl uppercase">Panduan Pengelolaan Iuran</h2>
                 <button onClick={() => setShowGuideModal(false)}>
@@ -980,8 +980,8 @@ const PAGE_TX_SIZE = 10;
 
         {/* Modal Export Pilihan Periode */}
         {showExportModal && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white border-4 border-black w-full max-w-md neubrutal-shadow flex flex-col max-h-[90vh]">
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white border-4 border-black w-full max-w-md neubrutal-shadow flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[85vh]">
               <div className="p-4 border-b-4 border-black flex justify-between items-center bg-tertiary-fixed text-black sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl uppercase flex items-center gap-2">
                   <span className="material-symbols-outlined">download</span>
@@ -1047,8 +1047,8 @@ const PAGE_TX_SIZE = 10;
 
         {/* Modal Peringatan Data Kosong */}
         {showNoDataModal && (
-          <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white border-4 border-black w-full max-w-md neubrutal-shadow-lg flex flex-col max-h-[90vh]">
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white border-4 border-black w-full max-w-md neubrutal-shadow-lg flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[85vh]">
               <div className="p-4 border-b-4 border-black flex justify-between items-center bg-error text-white sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl uppercase flex items-center gap-2">
                   <span className="material-symbols-outlined text-2xl animate-bounce">warning</span>

@@ -224,8 +224,8 @@ export default function AdminWarga() {
 
         {/* Modal Tambah/Edit Warga */}
         {showModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white border-4 border-black w-full max-w-2xl max-h-[90vh] neubrutal-shadow flex flex-col">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white border-4 border-black w-full max-w-2xl max-h-[calc(100dvh-6rem)] md:max-h-[85vh] neubrutal-shadow flex flex-col">
               <div className="p-4 md:p-6 border-b-4 border-black flex justify-between items-center bg-surface-bright sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl md:text-2xl uppercase">
                   {isEditing ? 'Edit Data Warga' : 'Tambah Warga Baru'}
@@ -331,8 +331,8 @@ export default function AdminWarga() {
 
         {/* Import Modal */}
         {showImportModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white border-4 border-black w-full max-w-3xl max-h-[90vh] neubrutal-shadow flex flex-col">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white border-4 border-black w-full max-w-3xl max-h-[calc(100dvh-6rem)] md:max-h-[85vh] neubrutal-shadow flex flex-col">
               <div className="p-4 md:p-6 border-b-4 border-black flex justify-between items-center bg-surface-bright sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl md:text-2xl uppercase">Import Data Warga</h2>
                 <button onClick={() => setShowImportModal(false)} className="hover:text-error transition-colors">
@@ -827,8 +827,8 @@ export default function AdminWarga() {
 
         {/* Modal Panduan Admin */}
         {showGuideModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white border-4 border-black w-full max-w-2xl max-h-[90vh] neubrutal-shadow flex flex-col">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white border-4 border-black w-full max-w-2xl max-h-[calc(100dvh-6rem)] md:max-h-[85vh] neubrutal-shadow flex flex-col">
               <div className="p-4 md:p-6 border-b-4 border-black flex justify-between items-center bg-tertiary-fixed sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl md:text-2xl uppercase flex items-center gap-3">
                   <span className="material-symbols-outlined text-3xl">info</span>
@@ -912,8 +912,8 @@ export default function AdminWarga() {
 
         {/* Modal Export Pilihan Periode */}
         {showExportModal && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white border-4 border-black w-full max-w-md max-h-[90vh] neubrutal-shadow flex flex-col">
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white border-4 border-black w-full max-w-md max-h-[calc(100dvh-6rem)] md:max-h-[85vh] neubrutal-shadow flex flex-col">
               <div className="p-4 border-b-4 border-black flex justify-between items-center bg-tertiary-fixed text-black sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl uppercase flex items-center gap-2">
                   <span className="material-symbols-outlined">download</span>
@@ -987,8 +987,8 @@ export default function AdminWarga() {
 
         {/* Modal Peringatan Data Kosong */}
         {showNoDataModal && (
-          <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white border-4 border-black w-full max-w-md max-h-[90vh] neubrutal-shadow-lg flex flex-col overflow-hidden">
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white border-4 border-black w-full max-w-md max-h-[calc(100dvh-6rem)] md:max-h-[85vh] neubrutal-shadow-lg flex flex-col overflow-hidden">
               <div className="p-4 border-b-4 border-black flex justify-between items-center bg-error text-white sticky top-0 z-10">
                 <h2 className="font-display-bold text-xl uppercase flex items-center gap-2">
                   <span className="material-symbols-outlined text-2xl animate-bounce">warning</span>

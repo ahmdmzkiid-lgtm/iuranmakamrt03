@@ -236,8 +236,8 @@ export default function WargaDashboard() {
       </div>
 
       {showGuideModal && (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white border-4 border-black w-full max-w-2xl max-h-[90vh] neubrutal-shadow-lg flex flex-col overflow-hidden animate-in zoom-in duration-200">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white border-4 border-black w-full max-w-2xl max-h-[calc(100dvh-6rem)] md:max-h-[85vh] neubrutal-shadow-lg flex flex-col overflow-hidden animate-in zoom-in duration-200">
             {/* Header */}
             <div className="p-4 md:p-6 border-b-4 border-black flex justify-between items-center bg-tertiary-fixed text-black sticky top-0 z-10">
               <h2 className="font-display-bold text-xl md:text-2xl uppercase flex items-center gap-3">

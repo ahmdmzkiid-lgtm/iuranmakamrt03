@@ -34,7 +34,7 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(
       { id: user.id, role: user.role, nama: user.nama },
       process.env.JWT_SECRET,
-      { expiresIn: '1d' }
+      { expiresIn: '1095d' }
     )
 
     // Check if first login for warga
