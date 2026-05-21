@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import WargaLayout from '../../components/warga/WargaLayout'
 import api from '../../services/api'
 import { useNotification } from '../../context/NotificationContext'
@@ -11,49 +11,39 @@ const getBulanName = (bln) => {
 }
 
 export default function WargaTagihan() {
-  const [tagihanAktif, setTagihanAktif] = useState([])
-  const [profil, setProfil] = useState(null)
-  const [selected, setSelected] = useState([])
-  const [metode, setMetode] = useState('transfer')
+  const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [jumlahBulanAwal, setJumlahBulanAwal] = useState(1)
-  const [buktiFile, setBuktiFile] = useState(null)
-  const [previewUrl, setPreviewUrl] = useState(null)
   const [paymentSettings, setPaymentSettings] = useState(null)
   const { showAlert } = useNotification()
 
-  const fetchTagihan = async () => {
+  // Form states
+  const [payType, setPayType] = useState('semua') // 'warga' | 'makam' | 'semua'
+  const [jumlahBulanMakam, setJumlahBulanMakam] = useState(1)
+  const [bulanWarga, setBulanWarga] = useState(new Date().getMonth() + 1)
+  const [tahunWarga, setTahunWarga] = useState(new Date().getFullYear())
+  const [metode, setMetode] = useState('transfer') // 'transfer' | 'qris' | 'tunai'
+  const [buktiFile, setBuktiFile] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState(null)
+
+  const fetchSummary = async () => {
     try {
       setLoading(true)
-      const [resIuran, resProfil, resSettings] = await Promise.all([
-        api.get('/iuran'),
-        api.get('/warga/me'),
+      const [summaryRes, settingsRes] = await Promise.all([
+        api.get('/iuran/summary'),
         api.get('/settings')
       ])
+      setSummary(summaryRes.data)
+      setPaymentSettings(settingsRes.data)
       
-      setProfil(resProfil.data)
-      setPaymentSettings(resSettings.data)
-      
-      // Hanya ambil yang belum dibayar
-      const belumBayar = resIuran.data.filter((item) => item.status === 'belum_bayar')
-      
-      const formatted = belumBayar.map((item) => ({
-        id: item.id,
-        tipe: item.tipe,
-        jenis: `${item.tipe === 'warga' ? 'Iuran Warga' : 'Iuran Makam'} ${getBulanName(item.bulan)} ${item.tahun}`,
-        kategori: item.tipe === 'warga' ? 'Iuran Warga' : 'Iuran Makam',
-        nominal: Number(item.jumlah),
-        jatuhTempo: `10 ${getBulanName(item.bulan).substring(0, 3)} ${item.tahun}`,
-        status: item.status,
-        icon: item.tipe === 'warga' ? 'groups' : 'deceased',
-        color: 'bg-white',
-      }))
-      
-      setTagihanAktif(formatted)
-      setSelected(formatted.map((t) => t.id))
+      // Auto adjust payType if warga is already lunas for the month
+      if (summaryRes.data?.iuranWarga?.sudahBayar && !summaryRes.data?.warga?.makamLunas) {
+        setPayType('makam')
+      } else if (!summaryRes.data?.iuranWarga?.sudahBayar && summaryRes.data?.warga?.makamLunas) {
+        setPayType('warga')
+      }
     } catch (error) {
-      console.error('Failed to fetch tagihan:', error)
+      console.error('Failed to fetch summary:', error)
       showAlert('Gagal mengambil data tagihan')
     } finally {
       setLoading(false)
@@ -61,22 +51,8 @@ export default function WargaTagihan() {
   }
 
   useEffect(() => {
-    fetchTagihan()
+    fetchSummary()
   }, [])
-
-  const toggle = (id) =>
-    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
-
-  const totalBayarAktif = tagihanAktif
-    .filter((t) => selected.includes(t.id))
-    .reduce((sum, t) => sum + t.nominal, 0)
-
-  const isBayarAwal = tagihanAktif.length === 0
-  const [tipeAwal, setTipeAwal] = useState('warga')
-  const [nominalAwal, setNominalAwal] = useState('')
-  const totalBayarAwal = jumlahBulanAwal * (parseInt(nominalAwal) || 0)
-
-  const total = isBayarAwal ? totalBayarAwal : totalBayarAktif
 
   const handleFileChange = (e) => {
     const file = e.target.files[0]
@@ -86,12 +62,31 @@ export default function WargaTagihan() {
     }
   }
 
+  const billSummary = useMemo(() => {
+    if (!summary) return { totalWarga: 0, totalMakam: 0, total: 0 }
+
+    const isWarga = payType === 'warga' || payType === 'semua'
+    const isMakam = payType === 'makam' || payType === 'semua'
+
+    const totalWarga = isWarga && !summary.iuranWarga.sudahBayar ? Number(summary.iuranWarga.tarif) : 0
+    const totalMakam = isMakam && !summary.warga.makamLunas 
+      ? jumlahBulanMakam * summary.warga.jumlahOrang * Number(summary.iuranMakam.tarifPerOrang) 
+      : 0
+
+    return {
+      totalWarga,
+      totalMakam,
+      total: totalWarga + totalMakam
+    }
+  }, [summary, payType, jumlahBulanMakam])
+
   const handleBayar = async () => {
-    if (!isBayarAwal && selected.length === 0) return
-    
+    if (billSummary.total === 0) {
+      return showAlert('Tidak ada nominal iuran yang perlu dibayar')
+    }
+
     if (metode !== 'tunai' && !buktiFile) {
-      showAlert('Mohon unggah bukti pembayaran terlebih dahulu!')
-      return
+      return showAlert('Mohon unggah bukti transfer pembayaran!')
     }
 
     setIsSubmitting(true)
@@ -105,28 +100,34 @@ export default function WargaTagihan() {
       } else {
         namaMetode = `Transfer ${paymentSettings?.bank_name || 'Bank'}`
       }
+
       formData.append('metode', namaMetode)
       if (buktiFile) {
         formData.append('buktiBayar', buktiFile)
       }
 
-      if (isBayarAwal) {
-        formData.append('jumlahBulan', jumlahBulanAwal)
-        formData.append('tipe', tipeAwal)
-        formData.append('jumlah', nominalAwal)
-        await api.post('/iuran/bayar-awal', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        })
+      let endpoint = '/iuran/bayar-semua'
+      if (payType === 'warga') {
+        endpoint = '/iuran/bayar-warga'
+        formData.append('bulan', bulanWarga)
+        formData.append('tahun', tahunWarga)
+      } else if (payType === 'makam') {
+        endpoint = '/iuran/bayar-makam'
+        formData.append('jumlahBulan', jumlahBulanMakam)
       } else {
-        formData.append('iuranIds', JSON.stringify(selected))
-        await api.post('/iuran/bayar', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        })
+        formData.append('jumlahBulanMakam', jumlahBulanMakam)
+        formData.append('bulanWarga', bulanWarga)
+        formData.append('tahunWarga', tahunWarga)
       }
+
+      await api.post(endpoint, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+
       await showAlert('Pembayaran berhasil dikirim dan menunggu verifikasi!')
       setBuktiFile(null)
       setPreviewUrl(null)
-      fetchTagihan() // refresh data
+      fetchSummary()
     } catch (error) {
       console.error('Gagal bayar:', error)
       showAlert(error.response?.data?.message || 'Gagal melakukan pembayaran')
@@ -137,337 +138,278 @@ export default function WargaTagihan() {
 
   return (
     <WargaLayout>
-      <div className="max-w-7xl mx-auto max-w-full">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-lg flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <h1 className="font-display-bold text-headline-md md:text-display-bold uppercase mb-xs">
-              Tagihan Saya
-            </h1>
-            <p className="font-body-lg text-zinc-600">
-              Daftar tagihan aktif Anda.
+            <h1 className="font-display-bold text-3xl md:text-4xl uppercase leading-none">Pembayaran Iuran</h1>
+            <p className="font-body-md text-zinc-600 mt-2">
+              Silakan pilih jenis iuran yang ingin dibayarkan secara mandiri atau sekaligus.
             </p>
           </div>
-          <div className="bg-white border-4 border-black px-4 py-3 neubrutal-shadow">
-            <p className="font-label-bold uppercase text-[10px] text-zinc-500">Total Tagihan</p>
-            <p className="font-headline-md uppercase">{tagihanAktif.length}</p>
-          </div>
-        </div>
+        </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-gutter">
-          {/* Outstanding Bills */}
-          <div className="md:col-span-8 space-y-4 md:space-y-gutter">
-            <div className="bg-white border-4 border-black neubrutal-shadow-lg">
-              <div className="border-b-4 border-black p-4 bg-zinc-100 flex justify-between items-center">
-                <h2 className="font-headline-md uppercase flex items-center gap-2 text-sm md:text-base">
-                  <span className="material-symbols-outlined">receipt_long</span>
-                  Tagihan Aktif ({tagihanAktif.length})
-                </h2>
-                <span className="bg-error text-white border-2 border-black px-3 py-1 font-label-bold uppercase text-[10px]">
-                  Belum Bayar
-                </span>
+        {loading ? (
+          <div className="bg-white border-4 border-black p-8 text-center font-display-bold uppercase">
+            Memuat data pembayaran...
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Left: Pembayaran Form */}
+            <div className="lg:col-span-8 space-y-6">
+              
+              {/* Status & Progress Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Iuran Warga Info */}
+                <div className="border-4 border-black p-4 bg-zinc-50 flex items-start gap-4">
+                  <div className="w-10 h-10 bg-secondary-container border-2 border-black flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-xl">groups</span>
+                  </div>
+                  <div>
+                    <h3 className="font-headline-md uppercase text-xs">Iuran Bulanan Warga</h3>
+                    <p className="text-[10px] font-bold text-zinc-500 mt-1 uppercase">
+                      Bulan {getBulanName(summary?.iuranWarga?.bulanIni)}: {summary?.iuranWarga?.sudahBayar ? 'LUNAS' : 'BELUM BAYAR'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Iuran Makam Progress */}
+                <div className="border-4 border-black p-4 bg-zinc-50 flex items-start gap-4">
+                  <div className="w-10 h-10 bg-tertiary-fixed border-2 border-black flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-xl">deceased</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-headline-md uppercase text-xs">Iuran Makam (36 Bln)</h3>
+                    <p className="text-[10px] font-bold text-zinc-500 mt-1 uppercase">
+                      {summary?.warga?.bulanMakamTerbayar}/36 Bulan Terbayar
+                    </p>
+                    <p className="text-[9px] font-bold text-error mt-0.5 uppercase">
+                      Sisa {summary?.warga?.sisaBulanMakam} bulan wajib bayar
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <div className="p-4 space-y-3">
-                {loading ? (
-                  <p className="text-center text-zinc-500 py-4 font-bold uppercase text-xs">Memuat tagihan...</p>
-                ) : tagihanAktif.length === 0 ? (
-                  <p className="text-center text-zinc-500 py-4 font-bold uppercase text-xs">Tidak ada tagihan aktif.</p>
-                ) : (
-                  tagihanAktif.map((t) => {
-                    const checked = selected.includes(t.id)
-                    return (
-                      <label
-                        key={t.id}
-                        className={`block border-4 border-black p-4 neubrutal-shadow cursor-pointer transition-all ${
-                          checked ? 'bg-tertiary-fixed' : 'bg-white'
-                        }`}
-                      >
-                        <div className="flex items-start gap-3 md:gap-4">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggle(t.id)}
-                            className="w-5 h-5 border-2 border-black mt-1 shrink-0 accent-black"
-                          />
-                          <div className="w-10 h-10 md:w-12 md:h-12 bg-white border-2 border-black flex items-center justify-center shrink-0">
-                            <span className="material-symbols-outlined">{t.icon}</span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-start flex-wrap gap-1">
-                              <div className="min-w-0">
-                                <p className="font-headline-md text-sm md:text-base leading-tight">
-                                  {t.jenis}
-                                </p>
-                                <p className="font-label-bold uppercase text-[10px] text-zinc-600 mt-0.5">
-                                  {t.kategori} • {t.id}
-                                </p>
-                              </div>
-                              <p className="font-display-bold text-lg md:text-xl whitespace-nowrap">
-                                {formatRp(t.nominal)}
-                              </p>
-                            </div>
-                            <div className="mt-3 pt-3 border-t-2 border-black flex justify-between items-center flex-wrap gap-2">
-                              <p className="text-xs font-bold">
-                                <span className="uppercase text-zinc-500">Jatuh tempo:</span>{' '}
-                                {t.jatuhTempo}
-                              </p>
-                              <button className="bg-white border-2 border-black px-3 py-1 font-label-bold uppercase text-[10px] hover:bg-tertiary-fixed transition-colors">
-                                Detail
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </label>
-                    )
-                  })
+              {/* Form Input Iuran */}
+              <div className="bg-white border-4 border-black p-6 neubrutal-shadow-lg space-y-6">
+                <h2 className="font-display-bold text-xl uppercase border-b-4 border-black pb-2">Menu Pembayaran</h2>
+                
+                {/* 1. Pilih Iuran */}
+                <div>
+                  <label className="block font-label-bold uppercase text-xs mb-3">Pilih Iuran yang Ingin Dibayar</label>
+                  <div className="grid grid-cols-3 gap-3">
+                    <button
+                      type="button"
+                      disabled={summary?.iuranWarga?.sudahBayar}
+                      onClick={() => setPayType('warga')}
+                      className={`p-3 border-4 border-black font-headline-md uppercase text-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition-all ${
+                        payType === 'warga' ? 'bg-primary-container text-white' : 'bg-white hover:bg-zinc-50'
+                      } ${summary?.iuranWarga?.sudahBayar ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    >
+                      <span className="material-symbols-outlined text-lg">groups</span>
+                      Iuran Warga
+                    </button>
+                    <button
+                      type="button"
+                      disabled={summary?.warga?.makamLunas}
+                      onClick={() => setPayType('makam')}
+                      className={`p-3 border-4 border-black font-headline-md uppercase text-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition-all ${
+                        payType === 'makam' ? 'bg-tertiary-fixed text-black' : 'bg-white hover:bg-zinc-50'
+                      } ${summary?.warga?.makamLunas ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    >
+                      <span className="material-symbols-outlined text-lg">deceased</span>
+                      Iuran Makam
+                    </button>
+                    <button
+                      type="button"
+                      disabled={summary?.iuranWarga?.sudahBayar && summary?.warga?.makamLunas}
+                      onClick={() => setPayType('semua')}
+                      className={`p-3 border-4 border-black font-headline-md uppercase text-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition-all ${
+                        payType === 'semua' ? 'bg-black text-white animate-pulse' : 'bg-white hover:bg-zinc-50'
+                      } ${summary?.iuranWarga?.sudahBayar && summary?.warga?.makamLunas ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    >
+                      <span className="material-symbols-outlined text-lg">library_add_check</span>
+                      Keduanya
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Detail Pembayaran Iuran Warga */}
+                {(payType === 'warga' || payType === 'semua') && !summary?.iuranWarga?.sudahBayar && (
+                  <div className="border-4 border-black p-4 bg-secondary-container/20 space-y-4">
+                    <p className="font-display-bold text-xs uppercase text-zinc-500">Form Iuran Bulanan Warga (Rp 10.000 / KK)</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block font-label-bold uppercase text-[10px] mb-1 text-zinc-500">Bulan</label>
+                        <select
+                          className="w-full border-2 border-black p-2 text-xs font-bold bg-white"
+                          value={bulanWarga}
+                          onChange={(e) => setBulanWarga(parseInt(e.target.value))}
+                        >
+                          {[...Array(12)].map((_, i) => (
+                            <option key={i+1} value={i+1}>{getBulanName(i+1)}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block font-label-bold uppercase text-[10px] mb-1 text-zinc-500">Tahun</label>
+                        <select
+                          className="w-full border-2 border-black p-2 text-xs font-bold bg-white"
+                          value={tahunWarga}
+                          onChange={(e) => setTahunWarga(parseInt(e.target.value))}
+                        >
+                          {[2024, 2025, 2026, 2027].map(y => (
+                            <option key={y} value={y}>{y}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. Detail Pembayaran Iuran Makam */}
+                {(payType === 'makam' || payType === 'semua') && !summary?.warga?.makamLunas && (
+                  <div className="border-4 border-black p-4 bg-tertiary-fixed/20 space-y-4">
+                    <p className="font-display-bold text-xs uppercase text-zinc-500">Form Cicilan Iuran Makam</p>
+                    <div>
+                      <div className="flex justify-between items-baseline mb-2">
+                        <label className="block font-label-bold uppercase text-[10px] text-zinc-500">Pilih Jumlah Bulan yang Ingin Dibayarkan</label>
+                        <span className="text-[10px] font-mono font-bold text-zinc-500">Sisa wajib bayar: {summary?.warga?.sisaBulanMakam} Bln</span>
+                      </div>
+                      <input
+                        type="number"
+                        min="1"
+                        max={summary?.warga?.sisaBulanMakam || 36}
+                        className="w-full border-4 border-black p-3 font-bold bg-white text-sm"
+                        value={jumlahBulanMakam}
+                        onChange={(e) => setJumlahBulanMakam(Math.min(summary?.warga?.sisaBulanMakam || 36, Math.max(1, parseInt(e.target.value) || 1)))}
+                      />
+                      <p className="text-[10px] font-bold text-zinc-500 mt-2 uppercase">
+                        Perhitungan: {jumlahBulanMakam} Bulan × {summary?.warga?.jumlahOrang} Jiwa × {formatRp(summary?.iuranMakam?.tarifPerOrang)} = {formatRp(jumlahBulanMakam * summary?.warga?.jumlahOrang * summary?.iuranMakam?.tarifPerOrang)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                {billSummary.total === 0 && (
+                  <div className="bg-secondary-container border-2 border-black p-4 text-center text-xs font-black uppercase">
+                    🎉 Iuran Anda Sudah Lunas! Tidak ada pembayaran aktif yang diperlukan.
+                  </div>
                 )}
               </div>
             </div>
 
-            {/* Bayar di Awal Section */}
-            {tagihanAktif.length === 0 && !loading && (
-              <div className="bg-white border-4 border-black neubrutal-shadow-lg">
-                <div className="border-b-4 border-black p-4 bg-tertiary-fixed flex justify-between items-center">
-                  <h2 className="font-headline-md uppercase flex items-center gap-2 text-sm md:text-base">
-                    <span className="material-symbols-outlined">event_upcoming</span>
-                    Bayar Iuran Lebih Awal
-                  </h2>
-                </div>
-                <div className="p-4 md:p-md">
-                  <p className="font-body-md text-sm mb-4">
-                    Anda tidak memiliki tagihan aktif. Anda dapat membayar iuran untuk bulan-bulan berikutnya di awal.
-                  </p>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block font-label-bold uppercase mb-2 text-xs">Tipe Iuran</label>
-                      <select
-                        value={tipeAwal}
-                        onChange={(e) => setTipeAwal(e.target.value)}
-                        className="w-full px-4 py-3 border-4 border-black font-body-md focus:bg-tertiary-fixed focus:outline-none transition-colors"
-                      >
-                        <option value="warga">Iuran Bulanan Warga</option>
-                        <option value="makam">Iuran Makam Bulanan</option>
-                      </select>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block font-label-bold uppercase mb-2 text-xs">Nominal (Rp)</label>
-                        <input 
-                          type="number" 
-                          min="1" 
-                          placeholder="50000"
-                          value={nominalAwal} 
-                          onChange={(e) => setNominalAwal(e.target.value)}
-                          className="w-full px-4 py-3 border-4 border-black font-body-md focus:bg-tertiary-fixed focus:outline-none transition-colors" 
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-label-bold uppercase mb-2 text-xs">Jumlah Bulan</label>
-                        <input 
-                          type="number" 
-                          min="1" 
-                          max={12} 
-                          value={jumlahBulanAwal} 
-                          onChange={(e) => setJumlahBulanAwal(Math.min(12, Math.max(1, parseInt(e.target.value) || 1)))}
-                          className="w-full px-4 py-3 border-4 border-black font-body-md focus:bg-tertiary-fixed focus:outline-none transition-colors" 
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-label-bold uppercase mb-2 text-xs">Total</label>
-                        <p className="font-display-bold text-xl md:text-2xl pt-2">{formatRp(totalBayarAwal)}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Info Card */}
-            <div className="bg-primary-fixed border-4 border-black p-4 md:p-md neubrutal-shadow flex items-start gap-3 md:gap-4">
-              <div className="bg-white border-2 border-black p-2 shrink-0">
-                <span className="material-symbols-outlined">info</span>
-              </div>
-              <div>
-                <h4 className="font-headline-md uppercase text-sm md:text-base mb-1">
-                  Konfirmasi Pembayaran
-                </h4>
-                <p className="text-xs md:text-sm">
-                  Setelah menekan <strong>Bayar Sekarang</strong>, tagihan Anda akan berstatus pending.
-                  Bendahara akan memverifikasi dalam 1x24 jam.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Payment Summary Sidebar */}
-          <div className="md:col-span-4 mb-24 md:mb-0">
-            <div className="md:sticky md:top-28 space-y-gutter">
-              <div className="bg-secondary-container border-4 border-black p-4 md:p-md neubrutal-shadow-lg">
-                <h3 className="font-headline-md uppercase border-b-4 border-black pb-3 mb-4">
-                  Ringkasan Bayar
-                </h3>
-
-                <div className="space-y-2 mb-4">
-                  {!isBayarAwal ? (
-                    <>
-                      {tagihanAktif
-                        .filter((t) => selected.includes(t.id))
-                        .map((t) => (
-                          <div key={t.id} className="flex justify-between text-sm">
-                            <span className="truncate pr-2">{t.jenis}</span>
-                            <span className="font-bold whitespace-nowrap">{formatRp(t.nominal)}</span>
-                          </div>
-                        ))}
-                      {selected.length === 0 && (
-                        <p className="text-sm italic text-zinc-600">Belum ada tagihan dipilih.</p>
-                      )}
-                    </>
-                  ) : (
-                    <div className="flex justify-between text-sm">
-                      <span className="truncate pr-2">Pembayaran Awal ({jumlahBulanAwal} bulan)</span>
-                      <span className="font-bold whitespace-nowrap">{formatRp(totalBayarAwal)}</span>
-                    </div>
-                  )}
+            {/* Right: Payment Method & Struk Upload */}
+            <div className="lg:col-span-4 space-y-6">
+              <div className="bg-white border-4 border-black p-6 neubrutal-shadow-lg space-y-6">
+                <h3 className="font-display-bold text-lg uppercase border-b-4 border-black pb-2">Metode & Konfirmasi</h3>
+                
+                {/* Settle amount */}
+                <div className="bg-zinc-50 border-2 border-black p-3 flex justify-between items-center">
+                  <span className="font-label-bold uppercase text-xs text-zinc-500">Total Pembayaran</span>
+                  <span className="font-display-bold text-lg text-primary">{formatRp(billSummary.total)}</span>
                 </div>
 
-                <div className="border-t-4 border-black pt-3 flex justify-between items-center">
-                  <span className="font-label-bold uppercase text-xs">Total</span>
-                  <span className="font-display-bold text-2xl md:text-3xl">{formatRp(total)}</span>
-                </div>
-
-                {/* Metode Pembayaran */}
-                <div className="mt-4 pt-4 border-t-4 border-black">
-                  <p className="font-label-bold uppercase text-xs mb-3">Metode Pembayaran</p>
-                  <div className="space-y-2">
-                    {/* Transfer Bank */}
-                    <label
-                      className={`flex items-center gap-3 p-3 border-2 border-black cursor-pointer transition-colors ${
-                        metode === 'transfer' ? 'bg-black text-white' : 'bg-white text-black'
-                      }`}
-                    >
+                {/* Radio Button Options */}
+                {billSummary.total > 0 && (
+                  <div className="space-y-3">
+                    <label className="block font-label-bold uppercase text-xs">Pilih Metode Pembayaran</label>
+                    
+                    <label className={`flex items-center gap-3 p-3 border-2 border-black cursor-pointer transition-colors ${metode === 'transfer' ? 'bg-black text-white' : 'bg-white'}`}>
                       <input
                         type="radio"
-                        name="metode"
-                        value="transfer"
                         checked={metode === 'transfer'}
                         onChange={() => setMetode('transfer')}
-                        className="w-4 h-4 accent-primary"
+                        className="hidden"
                       />
-                      <span className="material-symbols-outlined text-sm md:text-base">account_balance</span>
+                      <span className="material-symbols-outlined">account_balance</span>
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-[10px] md:text-xs uppercase truncate">Transfer {paymentSettings?.bank_name || 'Bank'}</p>
-                        <p className="text-[9px] md:text-[10px] opacity-70 truncate">
-                          {paymentSettings?.bank_account || '...'}
-                        </p>
+                        <p className="font-bold text-xs uppercase truncate">Transfer Bank</p>
+                        <p className="text-[10px] opacity-70 truncate">{paymentSettings?.bank_name}: {paymentSettings?.bank_account}</p>
                       </div>
                     </label>
 
-                    {/* QRIS */}
-                    <label
-                      className={`flex items-center gap-3 p-3 border-2 border-black cursor-pointer transition-colors ${
-                        metode === 'qris' ? 'bg-black text-white' : 'bg-white text-black'
-                      }`}
-                    >
+                    <label className={`flex items-center gap-3 p-3 border-2 border-black cursor-pointer transition-colors ${metode === 'qris' ? 'bg-black text-white' : 'bg-white'}`}>
                       <input
                         type="radio"
-                        name="metode"
-                        value="qris"
                         checked={metode === 'qris'}
                         onChange={() => setMetode('qris')}
-                        className="w-4 h-4 accent-primary"
+                        className="hidden"
                       />
-                      <span className="material-symbols-outlined text-sm md:text-base">qr_code_2</span>
+                      <span className="material-symbols-outlined">qr_code_2</span>
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-[10px] md:text-xs uppercase truncate">Transfer QRIS</p>
-                        <p className="text-[9px] md:text-[10px] opacity-70 truncate">Otomatis / E-Wallet</p>
+                        <p className="font-bold text-xs uppercase truncate">Transfer QRIS</p>
+                        <p className="text-[10px] opacity-70 truncate">Instan / E-Wallet</p>
                       </div>
                     </label>
 
-                    {/* Tunai */}
-                    <label
-                      className={`flex items-center gap-3 p-3 border-2 border-black cursor-pointer transition-colors ${
-                        metode === 'tunai' ? 'bg-black text-white' : 'bg-white text-black'
-                      }`}
-                    >
+                    <label className={`flex items-center gap-3 p-3 border-2 border-black cursor-pointer transition-colors ${metode === 'tunai' ? 'bg-black text-white' : 'bg-white'}`}>
                       <input
                         type="radio"
-                        name="metode"
-                        value="tunai"
                         checked={metode === 'tunai'}
                         onChange={() => setMetode('tunai')}
-                        className="w-4 h-4 accent-primary"
+                        className="hidden"
                       />
                       <span className="material-symbols-outlined">payments</span>
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-xs uppercase">Bayar Tunai</p>
-                        <p className="text-[10px] opacity-70 truncate">Langsung ke Bendahara RT</p>
+                        <p className="font-bold text-xs uppercase truncate">Bayar Tunai</p>
+                        <p className="text-[10px] opacity-70 truncate">Langsung ke Pengurus RT</p>
                       </div>
                     </label>
                   </div>
-                </div>
+                )}
 
-                {/* QRIS Display if selected and exists */}
-                {metode === 'qris' && paymentSettings?.qris_url && (
-                  <div className="mt-4 pt-4 border-t-4 border-black text-center animate-in fade-in zoom-in duration-300">
-                    <p className="font-label-bold uppercase text-[10px] mb-2">Scan QRIS untuk Bayar</p>
-                    <div className="bg-white border-2 border-black p-2 inline-block neubrutal-shadow">
-                      <img 
-                        src={paymentSettings.qris_url.startsWith('http') ? paymentSettings.qris_url : `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${paymentSettings.qris_url}`} 
-                        alt="QRIS" 
-                        className="w-40 h-40 object-contain mx-auto"
-                      />
-                    </div>
+                {/* QRIS Image if selected */}
+                {metode === 'qris' && paymentSettings?.qris_url && billSummary.total > 0 && (
+                  <div className="border-4 border-black p-3 bg-white text-center">
+                    <p className="font-label-bold uppercase text-[9px] mb-2 text-zinc-500">Scan QRIS</p>
+                    <img 
+                      src={paymentSettings.qris_url} 
+                      alt="QRIS" 
+                      className="w-32 h-32 object-contain mx-auto" 
+                    />
                   </div>
                 )}
 
-                {/* Upload Bukti Pembayaran */}
-                {metode !== 'tunai' && (
-                  <div className="mt-4 pt-4 border-t-4 border-black">
-                    <p className="font-label-bold uppercase text-xs mb-3 flex items-center gap-2 text-primary">
-                      <span className="material-symbols-outlined text-sm">upload_file</span>
-                      Upload Bukti Transfer
-                    </p>
-                    <div className="space-y-3">
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        onChange={handleFileChange}
-                        className="hidden" 
-                        id="bukti-pembayaran"
-                      />
-                      <label 
-                        htmlFor="bukti-pembayaran"
-                        className="flex flex-col items-center justify-center border-4 border-dashed border-black p-4 cursor-pointer hover:bg-surface-container transition-colors"
-                      >
-                        {previewUrl ? (
-                          <img src={previewUrl} alt="Preview" className="max-h-32 object-contain" />
-                        ) : (
-                          <>
-                            <span className="material-symbols-outlined text-3xl mb-1">add_a_photo</span>
-                            <p className="text-[10px] font-bold uppercase text-center">Klik untuk pilih gambar</p>
-                          </>
-                        )}
-                      </label>
-                      {buktiFile && (
-                        <p className="text-[10px] font-label-bold text-center truncate">{buktiFile.name}</p>
+                {/* Upload Bukti File */}
+                {metode !== 'tunai' && billSummary.total > 0 && (
+                  <div className="space-y-3">
+                    <label className="block font-label-bold uppercase text-xs">Upload Bukti Pembayaran</label>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleFileChange}
+                      className="hidden" 
+                      id="struk-bukti"
+                    />
+                    <label 
+                      htmlFor="struk-bukti"
+                      className="flex flex-col items-center justify-center border-4 border-dashed border-black p-4 cursor-pointer hover:bg-zinc-50 transition-colors"
+                    >
+                      {previewUrl ? (
+                        <img src={previewUrl} alt="Preview" className="max-h-32 object-contain" />
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-2xl mb-1 text-zinc-400">add_a_photo</span>
+                          <p className="text-[10px] font-black uppercase text-zinc-500">Pilih Foto Struk</p>
+                        </>
                       )}
-                    </div>
+                    </label>
                   </div>
                 )}
 
+                {/* Submit button */}
                 <button
                   onClick={handleBayar}
-                  disabled={(!isBayarAwal && selected.length === 0) || isSubmitting}
-                  className="w-full mt-6 bg-primary text-white border-4 border-black p-4 font-display-bold uppercase text-sm md:text-base neubrutal-shadow-lg active:translate-x-1 active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:translate-x-0 disabled:active:translate-y-0"
+                  disabled={billSummary.total === 0 || isSubmitting}
+                  className="w-full bg-primary text-white border-4 border-black p-4 font-display-bold uppercase text-sm neubrutal-shadow-lg active-press disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  <span className="material-symbols-outlined">account_balance_wallet</span>
-                  {isSubmitting ? 'Memproses...' : 'Bayar Sekarang'}
+                  {isSubmitting ? 'Memproses...' : 'Kirim Konfirmasi Bayar'}
                 </button>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </WargaLayout>
   )

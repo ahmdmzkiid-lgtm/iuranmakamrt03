@@ -2,8 +2,6 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import AdminLayout from '../../components/admin/AdminLayout'
 import api from '../../services/api'
 import { useNotification } from '../../context/NotificationContext'
-import ExcelJS from 'exceljs'
-import { saveAs } from 'file-saver'
 
 const formatRp = (n) => 'Rp ' + Number(n).toLocaleString('id-ID')
 
@@ -34,19 +32,10 @@ export default function AdminIuran() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [wargaSearch, setWargaSearch] = useState('')
   const [showWargaDropdown, setShowWargaDropdown] = useState(false)
-  
-  // Export Modal States
-  const [showExportModal, setShowExportModal] = useState(false)
-  const [exportBulan, setExportBulan] = useState(new Date().getMonth() + 1)
-  const [exportTahun, setExportTahun] = useState(new Date().getFullYear())
-  
-  // Pagination States
-  const [currentPage, setCurrentPage] = useState(1) // History page
-  const [wargaProgressPage, setWargaProgressPage] = useState(1) // Warga list page
+  const [currentPage, setCurrentPage] = useState(1)
   const PAGE_SIZE = 10
-  
   const wargaDropdownRef = useRef(null)
-  const { showAlert } = useNotification()
+  const { showAlert, showConfirm } = useNotification()
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -124,6 +113,7 @@ export default function AdminIuran() {
     if (!rejectReason) return showAlert('Mohon isi alasan penolakan')
     try {
       setIsProcessing(true)
+      // Cek apakah id yang ditolak adalah transaksiId (string) atau iuranId (number)
       const isTx = typeof rejectId === 'string'
       if (isTx) {
         await api.put(`/iuran/verifikasi-transaksi/${rejectId}`, { action: 'tolak', alasan: rejectReason })
@@ -190,321 +180,7 @@ export default function AdminIuran() {
     }
   }
 
-  // Export to Excel logic
-  const handleExportExcel = async (selectedMonth, selectedYear) => {
-    try {
-      const workbook = new ExcelJS.Workbook()
-      const worksheet = workbook.addWorksheet('Laporan Pembayaran')
-
-      // Set manual column widths
-      worksheet.getColumn(1).width = 6;   // NO
-      worksheet.getColumn(2).width = 22;  // NO KK
-      worksheet.getColumn(3).width = 35;  // NAMA
-      worksheet.getColumn(4).width = 25;  // NIK
-      worksheet.getColumn(5).width = 18;  // IURAN MAKAM
-      worksheet.getColumn(6).width = 18;  // IURAN WARGA
-      worksheet.getColumn(7).width = 28;  // PERIODE
-      worksheet.getColumn(8).width = 16;  // JUMLAH
-      worksheet.getColumn(9).width = 20;  // METODE
-      worksheet.getColumn(10).width = 18; // TANGGAL BAYAR
-
-      // 1. Add Title Block in Laporan Pembayaran
-      const titleRow = worksheet.getRow(1)
-      titleRow.getCell(1).value = "LAPORAN BULANAN IURAN RT 03"
-      titleRow.getCell(1).font = { name: 'Arial', size: 16, bold: true }
-      worksheet.mergeCells('A1:J1')
-      titleRow.height = 30
-      titleRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' }
-
-      // 2. Add Subtitle / Export Date & Selected Month Info
-      const subtitleRow = worksheet.getRow(2)
-      subtitleRow.getCell(1).value = `Periode Laporan: ${getBulanName(selectedMonth)} ${selectedYear} | Tanggal Export: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`
-      subtitleRow.getCell(1).font = { name: 'Arial', size: 10, italic: true }
-      worksheet.mergeCells('A2:J2')
-      subtitleRow.height = 20
-      subtitleRow.alignment = { vertical: 'middle', horizontal: 'center' }
-
-      // Row 3 is blank
-      worksheet.getRow(3).height = 10
-
-      // 3. Setup Table Headers in Row 4
-      const headerRow = worksheet.getRow(4)
-      const headers = ['NO', 'NO KK', 'NAMA', 'NIK', 'IURAN MAKAM', 'IURAN WARGA', 'PERIODE', 'JUMLAH', 'METODE', 'TANGGAL BAYAR']
-      headers.forEach((h, i) => {
-        const cell = headerRow.getCell(i + 1)
-        cell.value = h
-        cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FFFFFF' } }
-        cell.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: '000000' } // Neubrutal black background
-        }
-        cell.alignment = { vertical: 'middle', horizontal: 'center' }
-        cell.border = {
-          top: { style: 'medium' },
-          left: { style: 'medium' },
-          bottom: { style: 'medium' },
-          right: { style: 'medium' }
-        }
-      })
-      headerRow.height = 25
-
-      // Filter only LUNAS payments for selected month and year based on PAYMENT DATE (tanggalBayar or createdAt)
-      const lunasIurans = dataIuran.filter(i => i.status === 'lunas').filter(row => {
-        const payDateStr = row.tanggalBayar || row.createdAt
-        if (!payDateStr) return false
-        const payDate = new Date(payDateStr)
-        return (payDate.getMonth() + 1) === selectedMonth && payDate.getFullYear() === selectedYear
-      })
-
-      // Cari Warga yang belum bayar IURAN WARGA untuk bulan dan tahun yang dipilih
-      const paidWargaIds = new Set(
-        lunasIurans.filter(i => i.tipe === 'warga').map(i => i.wargaId)
-      )
-      
-      const unpaidWarga = wargaList.filter(w => !paidWargaIds.has(w.id))
-
-      let totalSumMakam = 0
-      let totalSumWarga = 0
-      let totalSumGrand = 0
-      let rowIdxCounter = 1
-
-      // 4. Populate "SUDAH BAYAR" Rows
-      lunasIurans.forEach((row) => {
-        const namesList = []
-        const niksList = []
-
-        const kkNama = row.warga?.user?.nama || ''
-        const kkNik = row.warga?.user?.nik || ''
-        namesList.push(kkNama)
-        niksList.push(kkNik || '-')
-
-        const famList = Array.isArray(row.warga?.anggotaKeluarga) ? row.warga.anggotaKeluarga : []
-        famList.forEach(m => {
-          namesList.push(m.nama || '')
-          niksList.push(m.nik || '-')
-        })
-
-        const namesString = namesList.join('\r\n')
-        const niksString = niksList.join('\r\n')
-
-        const isMakam = row.tipe === 'makam'
-        const isWarga = row.tipe === 'warga'
-        const nominalMakam = isMakam ? Number(row.jumlah) : 0
-        const nominalWarga = isWarga ? Number(row.jumlah) : 0
-
-        totalSumMakam += nominalMakam
-        totalSumWarga += nominalWarga
-        totalSumGrand += Number(row.jumlah)
-
-        const dataRow = worksheet.getRow(5 + rowIdxCounter - 1)
-        dataRow.getCell(1).value = rowIdxCounter // NO
-        dataRow.getCell(2).value = row.warga?.user?.nomorKK || '-' // NO KK
-        dataRow.getCell(3).value = namesString // NAMA
-        dataRow.getCell(4).value = niksString // NIK
-        dataRow.getCell(5).value = nominalMakam // IURAN MAKAM
-        dataRow.getCell(6).value = nominalWarga // IURAN WARGA
-        dataRow.getCell(7).value = isWarga 
-          ? `${getBulanName(row.bulan)} ${row.tahun}` 
-          : `Makam (${row.jumlahBulan || 1} Bulan)` // PERIODE (only Makam (X Bulan) as requested!)
-        dataRow.getCell(8).value = Number(row.jumlah) // JUMLAH
-        dataRow.getCell(9).value = row.metode || '-' // METODE
-        dataRow.getCell(10).value = row.tanggalBayar ? new Date(row.tanggalBayar).toLocaleDateString('id-ID') : '-' // TANGGAL BAYAR
-
-        // Format all cells to CENTER as requested
-        for (let col = 1; col <= 10; col++) {
-          dataRow.getCell(col).alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
-          dataRow.getCell(col).border = {
-            top: { style: 'thin' },
-            left: { style: 'thin' },
-            bottom: { style: 'thin' },
-            right: { style: 'thin' }
-          }
-        }
-
-        // Numbers formatting
-        dataRow.getCell(5).numFmt = '#,##0'
-        dataRow.getCell(6).numFmt = '#,##0'
-        dataRow.getCell(8).numFmt = '#,##0'
-
-        rowIdxCounter++
-      })
-
-      // 5. Populate "BELUM BAYAR" Rows (below the paid ones)
-      unpaidWarga.forEach((w) => {
-        const namesList = []
-        const niksList = []
-
-        const kkNama = w.user?.nama || ''
-        const kkNik = w.user?.nik || ''
-        namesList.push(kkNama)
-        niksList.push(kkNik || '-')
-
-        const famList = Array.isArray(w.anggotaKeluarga) ? w.anggotaKeluarga : []
-        famList.forEach(m => {
-          namesList.push(m.nama || '')
-          niksList.push(m.nik || '-')
-        })
-
-        const namesString = namesList.join('\r\n')
-        const niksString = niksList.join('\r\n')
-
-        const dataRow = worksheet.getRow(5 + rowIdxCounter - 1)
-        dataRow.getCell(1).value = rowIdxCounter // NO
-        dataRow.getCell(2).value = w.user?.nomorKK || '-' // NO KK
-        dataRow.getCell(3).value = namesString // NAMA
-        dataRow.getCell(4).value = niksString // NIK
-        dataRow.getCell(5).value = '-' // IURAN MAKAM (dikosongkan dengan '-')
-        dataRow.getCell(6).value = '-' // IURAN WARGA (dikosongkan dengan '-')
-        dataRow.getCell(7).value = `${getBulanName(selectedMonth)} ${selectedYear} (BELUM BAYAR)` // PERIODE
-        dataRow.getCell(8).value = '-' // JUMLAH
-        dataRow.getCell(9).value = '-' // METODE
-        dataRow.getCell(10).value = '-' // TANGGAL BAYAR
-
-        // Format all cells to CENTER and thin borders
-        for (let col = 1; col <= 10; col++) {
-          dataRow.getCell(col).alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
-          dataRow.getCell(col).border = {
-            top: { style: 'thin' },
-            left: { style: 'thin' },
-            bottom: { style: 'thin' },
-            right: { style: 'thin' }
-          }
-        }
-
-        rowIdxCounter++
-      })
-
-      // 6. Add Bottom Total Row
-      const totalRowIndex = 5 + rowIdxCounter - 1
-      const totalRow = worksheet.getRow(totalRowIndex)
-      totalRow.getCell(1).value = "TOTAL PENERIMAAN"
-      worksheet.mergeCells(`A${totalRowIndex}:D${totalRowIndex}`)
-      totalRow.getCell(1).font = { name: 'Arial', size: 11, bold: true }
-      totalRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
-
-      totalRow.getCell(5).value = totalSumMakam
-      totalRow.getCell(6).value = totalSumWarga
-      totalRow.getCell(8).value = totalSumGrand
-
-      totalRow.getCell(5).font = { name: 'Arial', size: 11, bold: true }
-      totalRow.getCell(6).font = { name: 'Arial', size: 11, bold: true }
-      totalRow.getCell(8).font = { name: 'Arial', size: 11, bold: true }
-
-      totalRow.getCell(5).numFmt = '#,##0'
-      totalRow.getCell(6).numFmt = '#,##0'
-      totalRow.getCell(8).numFmt = '#,##0'
-
-      for (let col = 1; col <= 10; col++) {
-        totalRow.getCell(col).border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'double' },
-          right: { style: 'thin' }
-        }
-        totalRow.getCell(col).fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'F2F2F2' }
-        }
-      }
-      totalRow.height = 25
-
-      // 7. Create Sheet 2: Ringkasan
-      const summarySheet = workbook.addWorksheet('Ringkasan Penerimaan')
-      summarySheet.getColumn(1).width = 35 // KATEGORI
-      summarySheet.getColumn(2).width = 25 // TOTAL
-
-      // Title in summary sheet
-      const sumTitleRow = summarySheet.getRow(1)
-      sumTitleRow.getCell(1).value = "RINGKASAN PENERIMAAN IURAN RT 03"
-      sumTitleRow.getCell(1).font = { name: 'Arial', size: 14, bold: true }
-      summarySheet.mergeCells('A1:B1')
-      sumTitleRow.height = 30
-      sumTitleRow.alignment = { vertical: 'middle', horizontal: 'center' }
-
-      // Subtitle in summary sheet
-      const sumSubtitleRow = summarySheet.getRow(2)
-      sumSubtitleRow.getCell(1).value = `Periode Laporan: ${getBulanName(selectedMonth)} ${selectedYear}`
-      sumSubtitleRow.getCell(1).font = { name: 'Arial', size: 10, italic: true }
-      summarySheet.mergeCells('A2:B2')
-      sumSubtitleRow.height = 20
-      sumSubtitleRow.alignment = { vertical: 'middle', horizontal: 'center' }
-
-      // Headers in summary sheet
-      const sumHeaderRow = summarySheet.getRow(4)
-      sumHeaderRow.getCell(1).value = "KATEGORI PENERIMAAN"
-      sumHeaderRow.getCell(2).value = "TOTAL NOMINAL"
-      for (let col = 1; col <= 2; col++) {
-        const cell = sumHeaderRow.getCell(col)
-        cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FFFFFF' } }
-        cell.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: '000000' }
-        }
-        cell.alignment = { vertical: 'middle', horizontal: 'center' }
-        cell.border = {
-          top: { style: 'medium' },
-          left: { style: 'medium' },
-          bottom: { style: 'medium' },
-          right: { style: 'medium' }
-        }
-      }
-      sumHeaderRow.height = 25
-
-      // Rows
-      const r1 = summarySheet.getRow(5)
-      r1.getCell(1).value = "Total Penerimaan Iuran Warga"
-      r1.getCell(2).value = totalSumWarga
-
-      const r2 = summarySheet.getRow(6)
-      r2.getCell(1).value = "Total Penerimaan Iuran Makam"
-      r2.getCell(2).value = totalSumMakam
-
-      const r3 = summarySheet.getRow(7)
-      r3.getCell(1).value = "GRAND TOTAL PENERIMAAN"
-      r3.getCell(2).value = totalSumGrand
-
-      // Format Summary
-      const summaryRows = [r1, r2, r3]
-      summaryRows.forEach((r, i) => {
-        r.height = 25
-        r.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' } // CENTER as requested
-        r.getCell(2).alignment = { vertical: 'middle', horizontal: 'center' } // CENTER as requested
-        r.getCell(2).numFmt = 'Rp #,##0'
-
-        const isTotal = i === 2
-        for (let col = 1; col <= 2; col++) {
-          r.getCell(col).font = { name: 'Arial', size: 11, bold: isTotal }
-          r.getCell(col).border = {
-            top: { style: 'thin' },
-            left: { style: 'thin' },
-            bottom: { style: isTotal ? 'double' : 'thin' },
-            right: { style: 'thin' }
-          }
-          if (isTotal) {
-            r.getCell(col).fill = {
-              type: 'pattern',
-              pattern: 'solid',
-              fgColor: { argb: 'FFD54F' }
-            }
-          }
-        }
-      })
-
-      const buffer = await workbook.xlsx.writeBuffer()
-      const dataBlob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-      saveAs(dataBlob, `Laporan-Iuran-${getBulanName(selectedMonth)}-${selectedYear}-RT03.xlsx`)
-      showAlert(`Laporan Excel bulan ${getBulanName(selectedMonth)} ${selectedYear} berhasil diunduh!`)
-      setShowExportModal(false)
-    } catch (error) {
-      console.error('Failed to export excel:', error)
-      showAlert('Gagal mengunduh Laporan Excel')
-    }
-  }
-
-  // Group pending items
+  // Group pending items by transaksiId or individual id
   const pendingTransactions = useMemo(() => {
     const pendingList = dataIuran.filter(i => i.status === 'pending')
     const grouped = {}
@@ -530,30 +206,14 @@ export default function AdminIuran() {
     return Object.values(grouped)
   }, [dataIuran])
 
-  // Filter and sort Warga Progress (ALPHABETICAL)
-  const sortedWargaProgress = useMemo(() => {
-    const filtered = !wargaSearch 
-      ? wargaProgress 
-      : wargaProgress.filter(w => 
-          w.nama.toLowerCase().includes(wargaSearch.toLowerCase()) || 
-          w.nomorKK?.includes(wargaSearch)
-        )
-    
-    // Sort Alphabetically by Warga/KK Name
-    return [...filtered].sort((a, b) => 
-      (a.nama || '').localeCompare(b.nama || '', 'id', { sensitivity: 'base' })
+  const filteredWargaProgress = useMemo(() => {
+    if (!wargaSearch) return wargaProgress
+    return wargaProgress.filter(w => 
+      w.nama.toLowerCase().includes(wargaSearch.toLowerCase()) || 
+      w.nomorKK?.includes(wargaSearch)
     )
   }, [wargaProgress, wargaSearch])
 
-  // PAGINATION for Warga Progress
-  const paginatedWargaProgress = useMemo(() => {
-    const start = (wargaProgressPage - 1) * PAGE_SIZE
-    return sortedWargaProgress.slice(start, start + PAGE_SIZE)
-  }, [sortedWargaProgress, wargaProgressPage])
-
-  const totalWargaProgressPages = Math.ceil(sortedWargaProgress.length / PAGE_SIZE) || 1
-
-  // Filter and Paginate History
   const filteredHistory = useMemo(() => {
     return dataIuran.filter(i => 
       i.status === 'lunas' || i.status === 'ditolak'
@@ -563,6 +223,7 @@ export default function AdminIuran() {
     })
   }, [dataIuran, activeTab])
 
+  // Pagination for History
   const paginatedHistory = useMemo(() => {
     const start = (currentPage - 1) * PAGE_SIZE
     return filteredHistory.slice(start, start + PAGE_SIZE)
@@ -570,11 +231,9 @@ export default function AdminIuran() {
 
   const totalPages = Math.ceil(filteredHistory.length / PAGE_SIZE) || 1
 
-  // Reset pagination when tab/search changes
   useEffect(() => {
     setCurrentPage(1)
-    setWargaProgressPage(1)
-  }, [activeTab, wargaSearch])
+  }, [activeTab])
 
   const selectedWargaLabel = useMemo(() => {
     const selected = wargaList.find(w => w.id === parseInt(rekamData.wargaId))
@@ -592,14 +251,7 @@ export default function AdminIuran() {
               Sistem iuran bulanan warga dan pembayaran makam (36 bulan wajib bayar).
             </p>
           </div>
-          <div className="flex flex-row items-center gap-3 w-full md:w-auto overflow-x-auto pb-1">
-            <button
-              onClick={() => setShowExportModal(true)}
-              className="flex-1 md:flex-none bg-[#ffae19] text-black border-4 border-black px-4 md:px-6 py-3 font-headline-md uppercase neubrutal-shadow active-press flex items-center justify-center gap-2 text-xs md:text-base cursor-pointer whitespace-nowrap"
-            >
-              <span className="material-symbols-outlined">download</span>
-              Export Excel Report
-            </button>
+          <div className="flex flex-wrap gap-3">
             <button 
               onClick={() => {
                 setShowRekamModal(true)
@@ -612,7 +264,7 @@ export default function AdminIuran() {
                   tahunWarga: new Date().getFullYear()
                 })
               }}
-              className="flex-1 md:flex-none bg-primary text-white border-4 border-black px-4 md:px-6 py-3 font-headline-md uppercase neubrutal-shadow active-press flex items-center justify-center gap-2 text-xs md:text-base cursor-pointer whitespace-nowrap"
+              className="bg-primary text-white border-4 border-black px-6 py-3 font-headline-md uppercase neubrutal-shadow active:translate-x-1 active:translate-y-1 active:shadow-none transition-all flex items-center gap-2 text-sm md:text-base cursor-pointer"
             >
               <span className="material-symbols-outlined">payments</span>
               Rekam Bayar Offline
@@ -624,13 +276,12 @@ export default function AdminIuran() {
         {statistik && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div className="bg-primary-container text-white border-4 border-black p-4 neubrutal-shadow">
-              <p className="text-xs uppercase font-bold opacity-80">Total Warga (Jiwa)</p>
-              <p className="text-3xl font-display-bold mt-1">{statistik.totalWarga} Orang</p>
-              <p className="text-xs font-bold mt-2 text-white/70">Terdaftar di {statistik.totalKK} KK</p>
+              <p className="text-xs uppercase font-bold opacity-80">Total Warga</p>
+              <p className="text-3xl font-display-bold mt-1">{statistik.totalWarga} KK</p>
             </div>
             <div className="bg-secondary-container text-black border-4 border-black p-4 neubrutal-shadow">
               <p className="text-xs uppercase font-bold opacity-70">Iuran Warga Bulan Ini</p>
-              <p className="text-3xl font-display-bold mt-1">{statistik.iuranWarga?.sudahBayar} / {statistik.totalKK} KK</p>
+              <p className="text-3xl font-display-bold mt-1">{statistik.iuranWarga?.sudahBayar} / {statistik.totalWarga} KK</p>
               <p className="text-xs font-bold mt-2 text-zinc-600">Pendapatan: {formatRp(statistik.iuranWarga?.pendapatan)}</p>
             </div>
             <div className="bg-tertiary-fixed text-black border-4 border-black p-4 neubrutal-shadow">
@@ -759,7 +410,7 @@ export default function AdminIuran() {
         ) : activeTab === 'warga' ? (
           /* WARGA TAB (Bulanan) */
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left: Progress per KK (PAGINATED & ALPHABETICAL) */}
+            {/* Left: Progress per KK */}
             <div className="lg:col-span-2 space-y-4">
               <div className="bg-white border-4 border-black neubrutal-shadow">
                 <div className="p-4 border-b-4 border-black bg-zinc-100 flex items-center justify-between">
@@ -776,19 +427,19 @@ export default function AdminIuran() {
                   <table className="w-full text-left">
                     <thead className="bg-zinc-50 border-b-2 border-black">
                       <tr>
-                        <th className="p-3 font-label-bold uppercase text-xs">Warga / KK (A-Z)</th>
+                        <th className="p-3 font-label-bold uppercase text-xs">Warga / KK</th>
                         <th className="p-3 font-label-bold uppercase text-xs text-center">Iuran Warga</th>
                         <th className="p-3 font-label-bold uppercase text-xs text-center">Sisa Makam</th>
                         <th className="p-3 font-label-bold uppercase text-xs text-right">Status</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {paginatedWargaProgress.length === 0 ? (
+                      {filteredWargaProgress.length === 0 ? (
                         <tr>
                           <td colSpan="4" className="p-4 text-center text-xs font-bold uppercase text-zinc-500">Tidak ada data warga</td>
                         </tr>
                       ) : (
-                        paginatedWargaProgress.map(w => (
+                        filteredWargaProgress.map(w => (
                           <tr key={w.id} className="border-b border-black/10 hover:bg-zinc-50">
                             <td className="p-3">
                               <p className="font-bold text-sm">{w.nama}</p>
@@ -825,29 +476,6 @@ export default function AdminIuran() {
                     </tbody>
                   </table>
                 </div>
-
-                {/* Pagination for Warga List */}
-                {totalWargaProgressPages > 1 && (
-                  <div className="p-4 flex justify-between items-center bg-zinc-50 border-t-2 border-black">
-                    <button
-                      onClick={() => setWargaProgressPage(p => Math.max(p - 1, 1))}
-                      disabled={wargaProgressPage === 1}
-                      className="px-3 py-1.5 border-2 border-black bg-white font-bold text-xs uppercase hover:bg-zinc-50 active-press disabled:opacity-50"
-                    >
-                      Sebelumnya
-                    </button>
-                    <span className="text-xs font-bold">
-                      Halaman {wargaProgressPage} dari {totalWargaProgressPages} ({sortedWargaProgress.length} Warga)
-                    </span>
-                    <button
-                      onClick={() => setWargaProgressPage(p => Math.min(p + 1, totalWargaProgressPages))}
-                      disabled={wargaProgressPage === totalWargaProgressPages}
-                      className="px-3 py-1.5 border-2 border-black bg-white font-bold text-xs uppercase hover:bg-zinc-50 active-press disabled:opacity-50"
-                    >
-                      Selanjutnya
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -903,7 +531,7 @@ export default function AdminIuran() {
         ) : (
           /* MAKAM TAB (36 Bulan) */
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left: Progress makam per KK (PAGINATED & ALPHABETICAL) */}
+            {/* Left: Progress makam per KK */}
             <div className="lg:col-span-2 space-y-4">
               <div className="bg-white border-4 border-black neubrutal-shadow">
                 <div className="p-4 border-b-4 border-black bg-zinc-100 flex items-center justify-between">
@@ -917,10 +545,10 @@ export default function AdminIuran() {
                   />
                 </div>
                 <div className="divide-y">
-                  {paginatedWargaProgress.length === 0 ? (
+                  {filteredWargaProgress.length === 0 ? (
                     <div className="p-8 text-center text-xs font-bold uppercase text-zinc-500">Tidak ada data warga</div>
                   ) : (
-                    paginatedWargaProgress.map(w => {
+                    filteredWargaProgress.map(w => {
                       const percentage = Math.min(100, Math.round((w.bulanMakamTerbayar / 36) * 100))
                       return (
                         <div key={w.id} className="p-4 hover:bg-zinc-50 flex flex-col md:flex-row justify-between md:items-center gap-4">
@@ -961,29 +589,6 @@ export default function AdminIuran() {
                     })
                   )}
                 </div>
-
-                {/* Pagination for Warga List in Makam Tab */}
-                {totalWargaProgressPages > 1 && (
-                  <div className="p-4 flex justify-between items-center bg-zinc-50 border-t-2 border-black">
-                    <button
-                      onClick={() => setWargaProgressPage(p => Math.max(p - 1, 1))}
-                      disabled={wargaProgressPage === 1}
-                      className="px-3 py-1.5 border-2 border-black bg-white font-bold text-xs uppercase hover:bg-zinc-50 active-press disabled:opacity-50"
-                    >
-                      Sebelumnya
-                    </button>
-                    <span className="text-xs font-bold">
-                      Halaman {wargaProgressPage} dari {totalWargaProgressPages} ({sortedWargaProgress.length} Warga)
-                    </span>
-                    <button
-                      onClick={() => setWargaProgressPage(p => Math.min(p + 1, totalWargaProgressPages))}
-                      disabled={wargaProgressPage === totalWargaProgressPages}
-                      className="px-3 py-1.5 border-2 border-black bg-white font-bold text-xs uppercase hover:bg-zinc-50 active-press disabled:opacity-50"
-                    >
-                      Selanjutnya
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -1105,199 +710,129 @@ export default function AdminIuran() {
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
             <div className="bg-white border-4 border-black w-full max-w-lg neubrutal-shadow">
               <div className="p-4 border-b-4 border-black bg-primary text-white flex justify-between items-center">
-                <h2 className="font-display-bold text-lg uppercase">Rekam Bayar Offline (Tunai)</h2>
-                <button onClick={() => setShowRekamModal(false)} className="hover:text-black transition-colors">
-                  <span className="material-symbols-outlined text-2xl">close</span>
+                <h2 className="font-display-bold text-xl uppercase">Rekam Bayar Offline</h2>
+                <button onClick={() => setShowRekamModal(false)}>
+                  <span className="material-symbols-outlined text-3xl">close</span>
                 </button>
               </div>
               <form onSubmit={handleRekamBayar} className="p-6 space-y-4">
-                {/* Cari Warga */}
+                {/* Warga Dropdown Search */}
                 <div className="relative" ref={wargaDropdownRef}>
-                  <label className="block font-label-bold uppercase text-xs mb-2">Cari & Pilih Warga (KK)</label>
-                  <input
-                    type="text"
-                    placeholder="Ketik nama warga atau nomor KK..."
-                    value={wargaSearch}
-                    onChange={(e) => {
-                      setWargaSearch(e.target.value)
-                      setShowWargaDropdown(true)
-                    }}
-                    onFocus={() => setShowWargaDropdown(true)}
-                    className="w-full border-4 border-black p-3 font-bold bg-white text-sm"
-                  />
+                  <label className="block font-label-bold uppercase mb-2">Pilih Warga / KK</label>
+                  <div 
+                    onClick={() => setShowWargaDropdown(true)}
+                    className="border-4 border-black p-3 font-bold bg-white flex justify-between items-center cursor-pointer"
+                  >
+                    <span>{selectedWargaLabel || 'Pilih Warga...'}</span>
+                    <span className="material-symbols-outlined">arrow_drop_down</span>
+                  </div>
+                  
                   {showWargaDropdown && (
-                    <div className="absolute z-50 left-0 right-0 max-h-48 overflow-y-auto border-4 border-black bg-white divide-y-2 divide-black/10 mt-1 shadow-lg">
+                    <div className="absolute left-0 right-0 z-50 mt-1 bg-white border-4 border-black max-h-60 overflow-y-auto neubrutal-shadow">
+                      <div className="p-2 border-b-2 border-black bg-zinc-50">
+                        <input
+                          type="text"
+                          placeholder="Ketik nama warga..."
+                          value={wargaSearch}
+                          onChange={(e) => setWargaSearch(e.target.value)}
+                          className="w-full border-2 border-black p-2 text-sm focus:ring-0 outline-none bg-white font-medium"
+                        />
+                      </div>
                       {wargaList
-                        .filter(w => 
-                          w.user?.nama.toLowerCase().includes(wargaSearch.toLowerCase()) ||
-                          w.user?.nomorKK.includes(wargaSearch)
-                        )
+                        .filter(w => w.user?.nama?.toLowerCase().includes(wargaSearch.toLowerCase()))
                         .map(w => (
                           <div
                             key={w.id}
                             onClick={() => {
-                              setRekamData(prev => ({ ...prev, wargaId: w.id }))
-                              setWargaSearch(`${w.user?.nama} (${w.user?.nomorKK})`)
+                              setRekamData({ ...rekamData, wargaId: w.id.toString() })
                               setShowWargaDropdown(false)
                             }}
-                            className="p-3 text-xs font-bold hover:bg-zinc-100 cursor-pointer"
+                            className="p-3 hover:bg-zinc-100 cursor-pointer font-bold text-sm border-b last:border-0"
                           >
-                            {w.user?.nama} - KK: {w.user?.nomorKK}
+                            {w.user?.nama} <span className="text-xs font-normal text-zinc-500">(KK: {w.user?.nomorKK})</span>
                           </div>
                         ))}
                     </div>
                   )}
-                  {rekamData.wargaId && (
-                    <p className="text-[11px] text-green-600 font-bold mt-1 uppercase">✓ Terpilih: {selectedWargaLabel}</p>
-                  )}
                 </div>
 
-                {/* Pilih Tipe Iuran */}
+                {/* Jenis Iuran */}
                 <div>
-                  <label className="block font-label-bold uppercase text-xs mb-2">Tipe Iuran</label>
-                  <select
-                    className="w-full border-4 border-black p-3 font-bold bg-white text-sm"
-                    value={rekamData.tipe}
-                    onChange={(e) => setRekamData(prev => ({ ...prev, tipe: e.target.value }))}
-                  >
-                    <option value="semua">Iuran Warga + Iuran Makam Sekaligus</option>
-                    <option value="warga">Iuran Warga Bulanan Saja</option>
-                    <option value="makam">Iuran Makam Saja</option>
-                  </select>
+                  <label className="block font-label-bold uppercase mb-2">Jenis Iuran yang Dibayar</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'warga', label: 'Iuran Warga' },
+                      { id: 'makam', label: 'Iuran Makam' },
+                      { id: 'semua', label: 'Keduanya' }
+                    ].map(j => (
+                      <button
+                        key={j.id}
+                        type="button"
+                        onClick={() => setRekamData({ ...rekamData, tipe: j.id })}
+                        className={`py-2 border-2 border-black font-bold text-xs uppercase ${
+                          rekamData.tipe === j.id ? 'bg-primary text-white' : 'bg-white hover:bg-zinc-50'
+                        }`}
+                      >
+                        {j.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Detail Iuran Warga */}
+                {/* Form fields based on selected Type */}
                 {(rekamData.tipe === 'warga' || rekamData.tipe === 'semua') && (
-                  <div className="p-4 border-2 border-black bg-secondary-container/20 space-y-3">
-                    <p className="font-display-bold text-xs uppercase text-zinc-500">Iuran Warga Bulanan (Rp 10.000 / KK)</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block font-label-bold uppercase text-[9px] mb-1">Bulan</label>
-                        <select
-                          className="w-full border-2 border-black p-2 font-bold text-xs bg-white"
-                          value={rekamData.bulanWarga}
-                          onChange={(e) => setRekamData(prev => ({ ...prev, bulanWarga: parseInt(e.target.value) }))}
-                        >
-                          {[...Array(12)].map((_, i) => (
-                            <option key={i+1} value={i+1}>{getBulanName(i+1)}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block font-label-bold uppercase text-[9px] mb-1">Tahun</label>
-                        <select
-                          className="w-full border-2 border-black p-2 font-bold text-xs bg-white"
-                          value={rekamData.tahunWarga}
-                          onChange={(e) => setRekamData(prev => ({ ...prev, tahunWarga: parseInt(e.target.value) }))}
-                        >
-                          {[2024, 2025, 2026, 2027].map(y => (
-                            <option key={y} value={y}>{y}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Detail Iuran Makam */}
-                {(rekamData.tipe === 'makam' || rekamData.tipe === 'semua') && (
-                  <div className="p-4 border-2 border-black bg-tertiary-fixed/20 space-y-3">
-                    <p className="font-display-bold text-xs uppercase text-zinc-500">Iuran Makam (Rp 10.000 / Orang / Bulan)</p>
+                  <div className="grid grid-cols-2 gap-4 border-2 border-black p-3 bg-zinc-50">
+                    <p className="col-span-2 text-[10px] font-black uppercase text-zinc-400">Periode Iuran Warga (Rp 10.000)</p>
                     <div>
-                      <label className="block font-label-bold uppercase text-[9px] mb-1">Jumlah Bulan yang Ingin Dibayar</label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="36"
-                        className="w-full border-2 border-black p-2 font-bold text-xs bg-white"
-                        value={rekamData.jumlahBulanMakam}
-                        onChange={(e) => setRekamData(prev => ({ ...prev, jumlahBulanMakam: Math.max(1, parseInt(e.target.value) || 1) }))}
-                      />
+                      <label className="block font-label-bold uppercase text-[10px] mb-1">Bulan</label>
+                      <select
+                        className="w-full border-2 border-black p-2 text-xs font-bold bg-white"
+                        value={rekamData.bulanWarga}
+                        onChange={(e) => setRekamData({ ...rekamData, bulanWarga: parseInt(e.target.value) })}
+                      >
+                        {[...Array(12)].map((_, i) => (
+                          <option key={i+1} value={i+1}>{getBulanName(i+1)}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-label-bold uppercase text-[10px] mb-1">Tahun</label>
+                      <select
+                        className="w-full border-2 border-black p-2 text-xs font-bold bg-white"
+                        value={rekamData.tahunWarga}
+                        onChange={(e) => setRekamData({ ...rekamData, tahunWarga: parseInt(e.target.value) })}
+                      >
+                        {[2024, 2025, 2026, 2027].map(y => (
+                          <option key={y} value={y}>{y}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 )}
 
-                {/* Action Buttons */}
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowRekamModal(false)}
-                    className="flex-1 py-3 border-4 border-black font-headline-md uppercase text-sm hover:bg-zinc-100"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isProcessing}
-                    className="flex-1 py-3 bg-primary text-white border-4 border-black font-headline-md uppercase text-sm neubrutal-shadow active-press disabled:opacity-50"
-                  >
-                    {isProcessing ? 'Menyimpan...' : 'Simpan Pembayaran'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+                {(rekamData.tipe === 'makam' || rekamData.tipe === 'semua') && (
+                  <div className="border-2 border-black p-3 bg-zinc-50">
+                    <p className="text-[10px] font-black uppercase text-zinc-400 mb-2">Iuran Makam (Rp 10.000 / Orang / Bulan)</p>
+                    <label className="block font-label-bold uppercase text-[10px] mb-1">Bayar Berapa Bulan?</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="36"
+                      className="w-full border-2 border-black p-2 text-xs font-bold bg-white"
+                      value={rekamData.jumlahBulanMakam}
+                      onChange={(e) => setRekamData({ ...rekamData, jumlahBulanMakam: parseInt(e.target.value) || 1 })}
+                    />
+                  </div>
+                )}
 
-        {/* Modal Pilih Bulan & Tahun Export Excel */}
-        {showExportModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white border-4 border-black w-full max-w-md neubrutal-shadow">
-              <div className="p-4 border-b-4 border-black bg-[#ffae19] text-black flex justify-between items-center">
-                <h2 className="font-display-bold text-lg uppercase flex items-center gap-2">
-                  <span className="material-symbols-outlined">download</span>
-                  Export Laporan Bulanan
-                </h2>
-                <button onClick={() => setShowExportModal(false)} className="hover:text-white transition-colors">
-                  <span className="material-symbols-outlined text-2xl font-bold">close</span>
+                <button
+                  type="submit"
+                  disabled={isProcessing}
+                  className="w-full bg-secondary-container text-black border-4 border-black py-3 font-headline-md uppercase text-sm neubrutal-shadow active-press disabled:opacity-50"
+                >
+                  {isProcessing ? 'Memproses...' : 'Simpan Pembayaran'}
                 </button>
-              </div>
-              <div className="p-6 space-y-4">
-                <p className="text-xs font-bold text-zinc-600 uppercase">
-                  Pilih bulan dan tahun pembayaran lunas untuk diekspor ke format Excel.
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-label-bold uppercase text-[10px] mb-1">Bulan</label>
-                    <select
-                      className="w-full border-4 border-black p-3 font-bold text-sm bg-white"
-                      value={exportBulan}
-                      onChange={(e) => setExportBulan(parseInt(e.target.value))}
-                    >
-                      {[...Array(12)].map((_, i) => (
-                        <option key={i+1} value={i+1}>{getBulanName(i+1)}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block font-label-bold uppercase text-[10px] mb-1">Tahun</label>
-                    <select
-                      className="w-full border-4 border-black p-3 font-bold text-sm bg-white"
-                      value={exportTahun}
-                      onChange={(e) => setExportTahun(parseInt(e.target.value))}
-                    >
-                      {[2024, 2025, 2026, 2027].map(y => (
-                        <option key={y} value={y}>{y}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex gap-3 pt-4 border-t-2 border-black/10">
-                  <button
-                    onClick={() => setShowExportModal(false)}
-                    className="flex-1 py-3 border-4 border-black font-headline-md uppercase text-sm hover:bg-zinc-100"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    onClick={() => handleExportExcel(exportBulan, exportTahun)}
-                    className="flex-1 py-3 bg-[#ffae19] text-black border-4 border-black font-headline-md uppercase text-sm neubrutal-shadow active-press"
-                  >
-                    Export Excel
-                  </button>
-                </div>
-              </div>
+              </form>
             </div>
           </div>
         )}

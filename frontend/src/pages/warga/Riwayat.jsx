@@ -98,7 +98,9 @@ export default function WargaRiwayat() {
                   </div>
                   <div>
                     <h3 className="font-headline-md text-sm md:text-base uppercase leading-tight">
-                      Deskripsi: {item.tipe === 'warga' ? 'Iuran Warga' : 'Iuran Makam'} {getBulanName(item.bulan)}, {item.tahun}
+                      {item.tipe === 'warga' 
+                        ? `Iuran Warga ${getBulanName(item.bulan)} ${item.tahun}` 
+                        : `Iuran Makam (${item.jumlahBulan || 1} Bulan • ${item.jumlahOrang || 1} Orang)`}
                     </h3>
                     <p className="font-label-bold uppercase text-[10px] text-zinc-500 mt-1">
                       {item.metode || 'Metode Belum Tersedia'} • {formatRp(item.jumlah)}

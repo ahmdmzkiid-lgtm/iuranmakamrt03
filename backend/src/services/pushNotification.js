@@ -4,8 +4,8 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 // VAPID keys - simpan di .env untuk production
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BExD9O_AXBRSOcD2JedL9FFHtMJ0pg47a0_kg9R6CQs5D4Gl4Aj9ZsxTfzbxuRY5Lu4xnuNqEaM'
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'LaVjB5TSlwBsU99TLRHzPmBsp6fhP4f3kB6_'
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BJLG2gJh0XFs1oOtudfNseNVZILb9lWDifQW_uzry6yebs55G6OSb5MCT9E0KTcgexS9LAKZeCaU0beluW2HxVY'
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '2fsKKJuMeO5gmI-Zj5iZ7zeUY9vmktp7_-YYhMYoxRY'
 
 webpush.setVapidDetails(
   'mailto:admin@iuranrt03.com',

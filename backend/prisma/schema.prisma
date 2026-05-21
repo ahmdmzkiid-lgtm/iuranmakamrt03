@@ -29,8 +29,8 @@ model Warga {
   makam     Makam?   @relation(fields: [makamId], references: [id])
   alamat        String?
   telepon       String?
-  jumlahMakam   Int      @default(1)
-  bulanTerbayar Int      @default(0)
+  jumlahOrang   Int      @default(1)  // Total orang (KK + anggota) untuk iuran makam
+  bulanMakamTerbayar Int @default(0)  // Progress iuran makam (0-36)
   anggotaKeluarga Json?
   isFirstLogin   Boolean  @default(true)
   iuran         Iuran[]
@@ -49,11 +49,18 @@ model Iuran {
   id        Int      @id @default(autoincrement())
   wargaId   Int
   warga     Warga    @relation(fields: [wargaId], references: [id])
-  tipe      String   @default("makam") // warga | makam
-  tahun     Int
-  bulan     Int
+  tipe      String   @default("warga") // warga | makam
+  
+  // Untuk iuran WARGA (bulanan per KK)
+  tahun     Int?
+  bulan     Int?
+  
+  // Untuk iuran MAKAM (36 bulan)
+  jumlahBulan Int?    // Berapa bulan yang dibayar (untuk makam)
+  jumlahOrang Int?    // Berapa orang yang dibayar (untuk makam)
+  
   jumlah    Decimal  @db.Decimal(10, 2)
-  status    String   // belum_bayar | pending | lunas
+  status    String   // pending | lunas | ditolak
   metode    String?  // Transfer BCA, Tunai, dll
   buktiBayar String?
   tanggalBayar DateTime?

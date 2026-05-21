@@ -20,12 +20,19 @@ router.get('/me', verifyToken, async (req, res) => {
     if (!warga) return res.status(404).json({ error: 'Data warga tidak ditemukan' })
     
     // Hitung bulan makam yang sudah lunas
-    const bulanMakamLunas = warga.iuran.filter(i => i.tipe === 'makam' && i.status === 'lunas').length
+    const famList = Array.isArray(warga.anggotaKeluarga) ? warga.anggotaKeluarga : []
+    const realJumlahOrang = 1 + famList.length
+    const lunasMakam = warga.iuran
+      .filter(i => i.tipe === 'makam' && i.status === 'lunas')
+      .reduce((sum, i) => sum + (i.jumlahBulan || 0), 0)
+
+    const bulanMakamLunas = lunasMakam || warga.bulanMakamTerbayar || 0
     const TOTAL_BULAN_MAKAM = 36
     const sisaBulanMakam = Math.max(0, TOTAL_BULAN_MAKAM - bulanMakamLunas)
     
     res.json({
       ...warga,
+      jumlahOrang: realJumlahOrang,
       bulanMakamLunas,
       sisaBulanMakam,
       totalBulanMakam: TOTAL_BULAN_MAKAM
@@ -82,9 +89,17 @@ router.get('/', verifyToken, requireRole('admin'), async (req, res) => {
     // Tambahkan info sisa bulan makam untuk setiap warga
     const TOTAL_BULAN_MAKAM = 36
     const wargaWithMakamInfo = warga.map(w => {
-      const bulanMakamLunas = w.iuran.filter(i => i.tipe === 'makam' && i.status === 'lunas').length
+      const famList = Array.isArray(w.anggotaKeluarga) ? w.anggotaKeluarga : []
+      const realJumlahOrang = 1 + famList.length
+      const lunasMakam = w.iuran
+        .filter(i => i.tipe === 'makam' && i.status === 'lunas')
+        .reduce((sum, i) => sum + (i.jumlahBulan || 0), 0)
+      
+      const bulanMakamLunas = lunasMakam || w.bulanMakamTerbayar || 0
+      
       return {
         ...w,
+        jumlahOrang: realJumlahOrang, // Hitung dinamis dari database KK + anggota
         bulanMakamLunas,
         sisaBulanMakam: Math.max(0, TOTAL_BULAN_MAKAM - bulanMakamLunas),
         totalBulanMakam: TOTAL_BULAN_MAKAM
@@ -189,14 +204,15 @@ router.post('/import', verifyToken, requireRole('admin'), async (req, res) => {
 
 router.post('/', verifyToken, requireRole('admin'), async (req, res) => {
   try {
-    const { nama, nomorKK, nik, password, alamat, telepon, jumlahMakam, bulanTerbayar, anggotaKeluarga } = req.body
+    const { nama, nomorKK, nik, password, alamat, telepon, bulanTerbayar, anggotaKeluarga } = req.body
 
     if (!nama || !nomorKK || !password) {
       return res.status(400).json({ error: 'Nama, Nomor KK, dan Password wajib diisi' })
     }
 
-    const jMakam = parseInt(jumlahMakam) || 1
     const bTerbayar = parseInt(bulanTerbayar) || 0
+    const famList = Array.isArray(anggotaKeluarga) ? anggotaKeluarga : []
+    const totalOrang = 1 + famList.length
 
     const hashedPassword = await bcrypt.hash(password, 10)
 
@@ -211,9 +227,9 @@ router.post('/', verifyToken, requireRole('admin'), async (req, res) => {
           create: {
             alamat,
             telepon,
-            jumlahMakam: jMakam,
-            bulanTerbayar: bTerbayar,
-            anggotaKeluarga: anggotaKeluarga || []
+            jumlahOrang: totalOrang,
+            bulanMakamTerbayar: bTerbayar,
+            anggotaKeluarga: famList
           }
         }
       },
@@ -224,18 +240,16 @@ router.post('/', verifyToken, requireRole('admin'), async (req, res) => {
 
     // Auto-generate iuran bulan ini
     // Iuran warga: 10.000/KK
-    // Iuran makam: 10.000 x (1 kepala keluarga + jumlah anggota)
+    // Iuran makam: 10.000 x totalOrang
     const now = new Date()
     const currentMonth = now.getMonth() + 1
     const currentYear = now.getFullYear()
     const IURAN_PER_ORANG = 10000
-    const jumlahAnggota = Array.isArray(anggotaKeluarga) ? anggotaKeluarga.length : 0
-    const totalOrang = 1 + jumlahAnggota // 1 kepala keluarga + anggota
 
     await prisma.iuran.createMany({
       data: [
         { wargaId: newUser.warga.id, tipe: 'warga', tahun: currentYear, bulan: currentMonth, jumlah: IURAN_PER_ORANG, status: 'belum_bayar' },
-        { wargaId: newUser.warga.id, tipe: 'makam', tahun: currentYear, bulan: currentMonth, jumlah: IURAN_PER_ORANG * totalOrang, status: 'belum_bayar' }
+        { wargaId: newUser.warga.id, tipe: 'makam', jumlahBulan: 1, jumlahOrang: totalOrang, jumlah: IURAN_PER_ORANG * totalOrang, status: 'belum_bayar' }
       ]
     })
 
@@ -252,7 +266,7 @@ router.post('/', verifyToken, requireRole('admin'), async (req, res) => {
 router.put('/:id', verifyToken, requireRole('admin'), async (req, res) => {
   try {
     const id = parseInt(req.params.id)
-    const { nama, nomorKK, nik, password, alamat, telepon, jumlahMakam, bulanTerbayar, anggotaKeluarga } = req.body
+    const { nama, nomorKK, nik, password, alamat, telepon, bulanTerbayar, anggotaKeluarga } = req.body
 
     console.log('Update warga:', id, req.body)
 
@@ -267,12 +281,18 @@ router.put('/:id', verifyToken, requireRole('admin'), async (req, res) => {
     const wargaUpdateData = {}
     if (alamat !== undefined) wargaUpdateData.alamat = alamat
     if (telepon !== undefined) wargaUpdateData.telepon = telepon
-    if (jumlahMakam !== undefined && !isNaN(parseInt(jumlahMakam))) {
-      wargaUpdateData.jumlahMakam = parseInt(jumlahMakam)
+    
+    // Auto calculate and update jumlahOrang based on anggotaKeluarga
+    if (anggotaKeluarga !== undefined) {
+      const famList = Array.isArray(anggotaKeluarga) ? anggotaKeluarga : []
+      wargaUpdateData.anggotaKeluarga = famList
+      wargaUpdateData.jumlahOrang = 1 + famList.length
     }
+
     // Handle bulanTerbayar - create iuran makam records
     if (bulanTerbayar !== undefined && !isNaN(parseInt(bulanTerbayar))) {
       const bulanBaru = parseInt(bulanTerbayar)
+      wargaUpdateData.bulanMakamTerbayar = bulanBaru
       
       // Get current warga data to check existing iuran
       const currentWarga = await prisma.warga.findUnique({
@@ -286,7 +306,9 @@ router.put('/:id', verifyToken, requireRole('admin'), async (req, res) => {
       // If new bulanTerbayar is greater, create new iuran records
       if (bulanBaru > existingLunas) {
         const IURAN_PER_ORANG = 10000
-        const jumlahAnggota = Array.isArray(currentWarga.anggotaKeluarga) ? currentWarga.anggotaKeluarga.length : 0
+        const jumlahAnggota = Array.isArray(anggotaKeluarga || currentWarga.anggotaKeluarga) 
+          ? (anggotaKeluarga || currentWarga.anggotaKeluarga).length 
+          : 0
         const totalOrang = 1 + jumlahAnggota
         const nominalPerBulan = IURAN_PER_ORANG * totalOrang
         
@@ -319,6 +341,8 @@ router.put('/:id', verifyToken, requireRole('admin'), async (req, res) => {
                 tahun: targetTahun,
                 bulan: targetBulan,
                 jumlah: nominalPerBulan,
+                jumlahBulan: 1,
+                jumlahOrang: totalOrang,
                 status: 'lunas',
                 metode: 'Bayar Sebelumnya',
                 tanggalBayar: new Date()
@@ -328,13 +352,18 @@ router.put('/:id', verifyToken, requireRole('admin'), async (req, res) => {
             // Update existing to lunas
             await prisma.iuran.update({
               where: { id: exists.id },
-              data: { status: 'lunas', metode: 'Bayar Sebelumnya', tanggalBayar: new Date() }
+              data: { 
+                status: 'lunas', 
+                metode: 'Bayar Sebelumnya', 
+                tanggalBayar: new Date(),
+                jumlahBulan: 1,
+                jumlahOrang: totalOrang
+              }
             })
           }
         }
       }
     }
-    if (anggotaKeluarga !== undefined) wargaUpdateData.anggotaKeluarga = anggotaKeluarga
     
     // Only add user update if there's data to update
     if (Object.keys(dataUser).length > 0) {

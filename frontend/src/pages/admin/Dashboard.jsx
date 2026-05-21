@@ -12,23 +12,31 @@ const getBulanName = (bln) => {
 
 const shortcuts = [
   { label: 'Kelola Warga', path: '/admin/warga', icon: 'groups', desc: 'Data & status penduduk', color: 'bg-white' },
-  { label: 'Kelola Iuran', path: '/admin/iuran', icon: 'payments', desc: 'Tagihan & pembayaran', color: 'bg-secondary-container' },
-  { label: 'Kelola Iuran', path: '/admin/makam', icon: 'tune', desc: 'Data makam & iuran', color: 'bg-primary-container', textColor: 'text-white' },
+  { label: 'Kelola Iuran', path: '/admin/iuran', icon: 'payments', desc: 'Sistem iuran baru', color: 'bg-secondary-container' },
+  { label: 'Notifikasi', path: '/admin/notifikasi', icon: 'notifications_active', desc: 'Kirim notifikasi push', color: 'bg-primary-container', textColor: 'text-white' },
   { label: 'Setelan', path: '/admin/setelan', icon: 'settings', desc: 'Konfigurasi sistem', color: 'bg-tertiary-fixed' },
 ]
 
 export default function AdminDashboard() {
+  const [statistik, setStatistik] = useState(null)
   const [dataIuran, setDataIuran] = useState([])
   const [loading, setLoading] = useState(true)
+
+  const currentMonth = new Date().getMonth() + 1
+  const currentYear = new Date().getFullYear()
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true)
-        const res = await api.get('/iuran')
-        setDataIuran(res.data)
+        const [statsRes, iuranRes] = await Promise.all([
+          api.get('/iuran/statistik'),
+          api.get('/iuran')
+        ])
+        setStatistik(statsRes.data)
+        setDataIuran(iuranRes.data)
       } catch (error) {
-        console.error('Failed to fetch iuran', error)
+        console.error('Failed to fetch dashboard data', error)
       } finally {
         setLoading(false)
       }
@@ -36,42 +44,21 @@ export default function AdminDashboard() {
     fetchData()
   }, [])
 
-  const currentMonth = new Date().getMonth() + 1
-  const currentYear = new Date().getFullYear()
-
-  // Tagihan bulan ini
-  const iuranBulanIni = dataIuran.filter(i => i.bulan === currentMonth && i.tahun === currentYear)
-  const iuranWargaBulanIni = iuranBulanIni.filter(i => i.tipe === 'warga')
-  const iuranMakamBulanIni = iuranBulanIni.filter(i => i.tipe === 'makam')
-  const totalTerkumpulBulanIni = iuranBulanIni.filter(i => i.status === 'lunas').reduce((sum, i) => sum + Number(i.jumlah), 0)
-  const estimasiBulanIni = iuranBulanIni.reduce((sum, i) => sum + Number(i.jumlah), 0)
-  const persentase = estimasiBulanIni > 0 ? Math.round((totalTerkumpulBulanIni / estimasiBulanIni) * 100) : 0
-
-  const terkumpulWarga = iuranWargaBulanIni.filter(i => i.status === 'lunas').reduce((sum, i) => sum + Number(i.jumlah), 0)
-  const terkumpulMakam = iuranMakamBulanIni.filter(i => i.status === 'lunas').reduce((sum, i) => sum + Number(i.jumlah), 0)
-  const estimasiWarga = iuranWargaBulanIni.reduce((sum, i) => sum + Number(i.jumlah), 0)
-  const estimasiMakam = iuranMakamBulanIni.reduce((sum, i) => sum + Number(i.jumlah), 0)
-  const pctWarga = estimasiWarga > 0 ? Math.round((terkumpulWarga / estimasiWarga) * 100) : 0
-  const pctMakam = estimasiMakam > 0 ? Math.round((terkumpulMakam / estimasiMakam) * 100) : 0
-
   const pendingItems = dataIuran.filter(i => i.status === 'pending')
-  const belumBayarBulanIni = iuranBulanIni.filter(i => i.status === 'belum_bayar')
-
-  const totalWarga = new Set(dataIuran.map(i => i.wargaId)).size
 
   const quickStats = [
-    { label: 'KK Aktif', value: loading ? '...' : totalWarga.toString(), icon: 'groups', bg: 'bg-primary-container', text: 'text-white' },
-    { label: `Terkumpul ${getBulanName(currentMonth)}`, value: loading ? '...' : formatRp(totalTerkumpulBulanIni), icon: 'payments', bg: 'bg-secondary-container', text: 'text-black' },
-    { label: 'Pending Verifikasi', value: loading ? '...' : pendingItems.length.toString(), icon: 'pending_actions', bg: 'bg-tertiary-fixed', text: 'text-black' },
-    { label: 'Total Tagihan', value: loading ? '...' : formatRp(estimasiBulanIni), icon: 'receipt_long', bg: 'bg-white', text: 'text-black' },
+    { label: 'KK Aktif', value: loading ? '...' : (statistik?.totalWarga?.toString() || '0'), icon: 'groups', bg: 'bg-primary-container', text: 'text-white' },
+    { label: `Iuran Warga ${getBulanName(currentMonth)}`, value: loading ? '...' : `${statistik?.iuranWarga?.sudahBayar || 0} / ${statistik?.totalWarga || 0} KK`, icon: 'payments', bg: 'bg-secondary-container', text: 'text-black' },
+    { label: 'Pending Verifikasi', value: loading ? '...' : (statistik?.pendingVerifikasi?.toString() || '0'), icon: 'pending_actions', bg: 'bg-tertiary-fixed', text: 'text-black' },
+    { label: 'Total Dana Makam', value: loading ? '...' : formatRp(statistik?.iuranMakam?.totalPendapatan || 0), icon: 'receipt_long', bg: 'bg-white', text: 'text-black' },
   ]
 
   const aktivitas = dataIuran
-    .filter(i => i.status !== 'belum_bayar')
+    .filter(i => i.status !== 'belum_bayar' && i.status !== 'ditolak')
     .slice(0, 4)
     .map(i => ({
       waktu: i.tanggalBayar ? new Date(i.tanggalBayar).toLocaleDateString('id-ID') : '-',
-      judul: `${i.warga?.user?.nama || 'Warga'} membayar ${i.tipe === 'warga' ? 'iuran warga' : 'iuran makam'}`,
+      judul: `${i.warga?.user?.nama || 'Warga'} membayar ${i.tipe === 'warga' ? 'Iuran Warga' : 'Iuran Makam'}`,
       detail: `${formatRp(i.jumlah)} • ${i.metode || 'Transfer'}`
     }))
 
@@ -79,11 +66,11 @@ export default function AdminDashboard() {
     <AdminLayout>
       <div className="max-w-7xl mx-auto max-w-full">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-lg">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
           <div>
-            <h1 className="font-display-bold text-headline-md md:text-display-bold uppercase">Dashboard Admin</h1>
+            <h1 className="font-display-bold text-3xl md:text-4xl uppercase leading-none">Dashboard Admin</h1>
             <p className="font-body-lg text-zinc-600 mt-2">
-              Ringkasan administrasi RT 03.
+              Ringkasan administrasi portal Iuran Makam & Warga RT 03.
             </p>
           </div>
           <div className="text-right hidden md:block">
@@ -93,66 +80,26 @@ export default function AdminDashboard() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-lg">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {quickStats.map((stat) => (
             <div key={stat.label} className={`border-4 border-black p-4 md:p-6 neubrutal-shadow ${stat.bg}`}>
               <span className={`material-symbols-outlined text-2xl md:text-3xl mb-2 block ${stat.text}`}>{stat.icon}</span>
-              <p className={`font-display-bold text-2xl md:text-headline-lg ${stat.text}`}>{stat.value}</p>
-              <p className={`font-label-bold text-xs uppercase opacity-70 mt-1 ${stat.text}`}>{stat.label}</p>
+              <p className={`font-display-bold text-lg md:text-2xl ${stat.text}`}>{stat.value}</p>
+              <p className={`font-label-bold text-[10px] md:text-xs uppercase opacity-70 mt-1 ${stat.text}`}>{stat.label}</p>
             </div>
           ))}
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-gutter mb-24 md:mb-0">
-          {/* Left: Activity Feed + Progress */}
-          <div className="w-full lg:w-[58%] space-y-gutter">
-            {/* Monthly Progress */}
-            <div className="bg-white border-4 border-black p-4 md:p-6 neubrutal-shadow">
-              <div className="flex justify-between items-end mb-4">
-                <h2 className="font-headline-md uppercase">Progress Iuran {getBulanName(currentMonth)}</h2>
-                <span className="font-display-bold text-2xl text-secondary">{loading ? '...' : `${persentase}%`}</span>
-              </div>
-              {/* Iuran Warga Progress */}
-              <div className="mb-3">
-                <div className="flex justify-between mb-1">
-                  <span className="text-[10px] font-black uppercase text-zinc-500">Iuran Warga</span>
-                  <span className="text-[10px] font-black uppercase text-secondary">{pctWarga}%</span>
-                </div>
-                <div className="w-full bg-zinc-200 border-2 border-black h-4">
-                  <div className="bg-primary h-full border-r-2 border-black transition-all duration-1000" style={{ width: `${pctWarga}%` }} />
-                </div>
-                <div className="flex justify-between mt-1">
-                  <span className="text-[10px] font-bold text-zinc-400">{formatRp(terkumpulWarga)}</span>
-                  <span className="text-[10px] font-bold text-zinc-400">{formatRp(estimasiWarga)}</span>
-                </div>
-              </div>
-              {/* Iuran Makam Progress */}
-              <div className="mb-2">
-                <div className="flex justify-between mb-1">
-                  <span className="text-[10px] font-black uppercase text-zinc-500">Iuran Makam</span>
-                  <span className="text-[10px] font-black uppercase text-secondary">{pctMakam}%</span>
-                </div>
-                <div className="w-full bg-zinc-200 border-2 border-black h-4">
-                  <div className="bg-secondary h-full border-r-2 border-black transition-all duration-1000" style={{ width: `${pctMakam}%` }} />
-                </div>
-                <div className="flex justify-between mt-1">
-                  <span className="text-[10px] font-bold text-zinc-400">{formatRp(terkumpulMakam)}</span>
-                  <span className="text-[10px] font-bold text-zinc-400">{formatRp(estimasiMakam)}</span>
-                </div>
-              </div>
-              <div className="flex justify-between mt-2 flex-wrap gap-1 pt-2 border-t-2 border-dashed border-zinc-300">
-                <span className="text-xs font-bold uppercase text-zinc-500">{formatRp(totalTerkumpulBulanIni)} total terkumpul</span>
-                <span className="text-xs font-bold uppercase text-zinc-500">Target {formatRp(estimasiBulanIni)}</span>
-              </div>
-            </div>
-
+        <div className="flex flex-col lg:flex-row gap-8 mb-24 md:mb-0">
+          {/* Left: Activity Feed */}
+          <div className="w-full lg:w-[58%] space-y-6">
             <div className="bg-white border-4 border-black p-4 md:p-6 neubrutal-shadow">
               <h2 className="font-headline-md uppercase border-b-4 border-black pb-3 mb-4">Aktivitas Terbaru</h2>
               <div>
                 {loading ? (
                   <p className="text-center py-4 font-bold text-xs uppercase text-zinc-500">Memuat...</p>
                 ) : aktivitas.length === 0 ? (
-                  <p className="text-center py-4 font-bold text-xs uppercase text-zinc-500">Belum ada aktivitas</p>
+                  <p className="text-center py-4 font-bold text-xs uppercase text-zinc-500">Belum ada aktivitas pembayaran</p>
                 ) : (
                   aktivitas.map((a, i) => (
                     <div key={i} className="flex gap-4 py-3 border-b-2 border-zinc-200 last:border-b-0">
@@ -169,13 +116,13 @@ export default function AdminDashboard() {
                 )}
               </div>
               <div className="mt-4 pt-4 border-t-2 border-black text-center">
-                <Link to="/admin/iuran" className="font-label-bold uppercase text-xs hover:underline">Lihat Semua Aktivitas</Link>
+                <Link to="/admin/iuran" className="font-label-bold uppercase text-xs hover:underline">Lihat Semua Transaksi</Link>
               </div>
             </div>
           </div>
 
-          {/* Right: Shortcuts & Notifications */}
-          <div className="w-full lg:w-[42%] space-y-gutter">
+          {/* Right: Shortcuts & Actions */}
+          <div className="w-full lg:w-[42%] space-y-6">
             <div className="grid grid-cols-2 gap-4">
               {shortcuts.map((s) => (
                 <Link
@@ -205,23 +152,15 @@ export default function AdminDashboard() {
                     Lihat
                   </Link>
                 </div>
+
                 <div className="bg-white border-2 border-black p-3 flex justify-between items-center gap-2">
                   <div className="min-w-0">
-                    <p className="font-bold text-sm">{iuranWargaBulanIni.filter(i => i.status === 'belum_bayar').length} Belum Bayar Warga</p>
-                    <p className="text-[10px] text-zinc-500 uppercase">Iuran Warga {getBulanName(currentMonth)}</p>
+                    <p className="font-bold text-sm">{statistik?.iuranWarga?.belumBayar || 0} Warga Belum Bayar</p>
+                    <p className="text-[10px] text-zinc-500 uppercase">Iuran Warga Bulan Ini</p>
                   </div>
-                  <button className="bg-tertiary-fixed text-black border-2 border-black px-3 py-1 font-label-bold uppercase text-[10px] shrink-0">
-                    Ingatkan
-                  </button>
-                </div>
-                <div className="bg-white border-2 border-black p-3 flex justify-between items-center gap-2">
-                  <div className="min-w-0">
-                    <p className="font-bold text-sm">{iuranMakamBulanIni.filter(i => i.status === 'belum_bayar').length} Belum Bayar Makam</p>
-                    <p className="text-[10px] text-zinc-500 uppercase">Iuran Makam {getBulanName(currentMonth)}</p>
-                  </div>
-                  <button className="bg-secondary text-white border-2 border-black px-3 py-1 font-label-bold uppercase text-[10px] shrink-0">
-                    Ingatkan
-                  </button>
+                  <Link to="/admin/notifikasi" className="bg-tertiary-fixed text-black border-2 border-black px-3 py-1 font-label-bold uppercase text-[10px] shrink-0">
+                    Kirim Notif
+                  </Link>
                 </div>
               </div>
             </div>
