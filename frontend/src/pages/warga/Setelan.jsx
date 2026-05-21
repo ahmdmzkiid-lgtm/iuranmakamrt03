@@ -92,6 +92,58 @@ export default function WargaSetelan() {
           </p>
         </div>
 
+        {/* Mobile Quick Links Hub (Only visible on mobile) */}
+        <div className="block md:hidden mb-6">
+          <div className="border-b-4 border-black pb-2 mb-4">
+            <h3 className="font-headline-md uppercase text-xs text-zinc-500">Akses Cepat Halaman</h3>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => navigate('/warga/riwayat')}
+              className="bg-emerald-300 border-4 border-black p-4 text-left flex flex-col justify-between min-h-[110px] neubrutal-shadow active:translate-x-1 active:translate-y-1 active:shadow-none transition-all"
+            >
+              <span className="material-symbols-outlined text-2xl bg-white border-2 border-black p-1 self-start text-black">history</span>
+              <div>
+                <span className="block font-display-bold uppercase text-[11px] leading-tight mt-2 text-black">Riwayat</span>
+                <span className="block font-label-bold text-[9px] opacity-60 uppercase text-black">Pembayaran</span>
+              </div>
+            </button>
+
+            <button
+              onClick={() => navigate('/warga/kuitansi')}
+              className="bg-amber-300 border-4 border-black p-4 text-left flex flex-col justify-between min-h-[110px] neubrutal-shadow active:translate-x-1 active:translate-y-1 active:shadow-none transition-all"
+            >
+              <span className="material-symbols-outlined text-2xl bg-white border-2 border-black p-1 self-start text-black">receipt_long</span>
+              <div>
+                <span className="block font-display-bold uppercase text-[11px] leading-tight mt-2 text-black">Kuitansi</span>
+                <span className="block font-label-bold text-[9px] opacity-60 uppercase text-black">Digital Warga</span>
+              </div>
+            </button>
+
+            <button
+              onClick={() => navigate('/warga/ubah-password')}
+              className="bg-sky-300 border-4 border-black p-4 text-left flex flex-col justify-between min-h-[110px] neubrutal-shadow active:translate-x-1 active:translate-y-1 active:shadow-none transition-all"
+            >
+              <span className="material-symbols-outlined text-2xl bg-white border-2 border-black p-1 self-start text-black">lock</span>
+              <div>
+                <span className="block font-display-bold uppercase text-[11px] leading-tight mt-2 text-black">Password</span>
+                <span className="block font-label-bold text-[9px] opacity-60 uppercase text-black">Ubah Sandi</span>
+              </div>
+            </button>
+
+            <button
+              onClick={() => window.open('https://wa.me/6282123576579?text=KONFIRMASI%20IURAN%20%3A%20', '_blank')}
+              className="bg-fuchsia-300 border-4 border-black p-4 text-left flex flex-col justify-between min-h-[110px] neubrutal-shadow active:translate-x-1 active:translate-y-1 active:shadow-none transition-all"
+            >
+              <span className="material-symbols-outlined text-2xl bg-white border-2 border-black p-1 self-start text-black">contact_support</span>
+              <div>
+                <span className="block font-display-bold uppercase text-[11px] leading-tight mt-2 text-black">Bendahara</span>
+                <span className="block font-label-bold text-[9px] opacity-60 uppercase text-black">Hubungi Pengurus</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
         {/* Success Banner */}
         {saved && (
           <div className="bg-secondary text-white border-4 border-black p-4 mb-6 neubrutal-shadow flex items-center gap-3 animate-pulse">

@@ -157,7 +157,7 @@ export default function WargaDashboard() {
                 <h3 className="font-headline-md uppercase text-base md:text-headline-md">
                   Riwayat Pembayaran Terakhir
                 </h3>
-                <button onClick={() => navigate('/warga/kuitansi')} className="font-label-bold uppercase text-primary underline text-xs md:text-sm">
+                <button onClick={() => navigate('/warga/riwayat')} className="font-label-bold uppercase text-primary underline text-xs md:text-sm">
                   Lihat Semua
                 </button>
               </div>

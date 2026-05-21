@@ -14,11 +14,9 @@ const navItems = [
 
 const mobileNavItems = [
   { label: 'Dash', path: '/warga', icon: 'dashboard' },
-  { label: 'Bill', path: '/warga/tagihan', icon: 'payments' },
-  { label: 'Hist', path: '/warga/riwayat', icon: 'history' },
+  { label: 'Tagihan', path: '/warga/tagihan', icon: 'payments' },
   { label: 'Makam', path: '/warga/makam', icon: 'church' },
-  { label: 'Receipt', path: '/warga/kuitansi', icon: 'receipt_long' },
-  { label: 'Set', path: '/warga/setelan', icon: 'settings' },
+  { label: 'Menu', path: '/warga/setelan', icon: 'menu' },
 ]
 
 export default function WargaLayout({ children }) {
@@ -26,6 +24,13 @@ export default function WargaLayout({ children }) {
   const navigate = useNavigate()
 
   const isActive = (path) => location.pathname === path
+
+  const isMobileActive = (path) => {
+    if (path === '/warga/setelan') {
+      return ['/warga/setelan', '/warga/riwayat', '/warga/kuitansi', '/warga/ubah-password'].includes(location.pathname)
+    }
+    return location.pathname === path
+  }
 
   const handleLogout = () => {
     localStorage.clear()
@@ -206,12 +211,12 @@ export default function WargaLayout({ children }) {
             key={item.label}
             to={item.path}
             className={`flex flex-col items-center gap-1 transition-all p-2 ${
-              isActive(item.path) ? 'text-primary' : 'text-black'
+              isMobileActive(item.path) ? 'text-primary' : 'text-black'
             }`}
           >
             <span
               className="material-symbols-outlined"
-              style={isActive(item.path) ? { fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24" } : {}}
+              style={isMobileActive(item.path) ? { fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24" } : {}}
             >
               {item.icon}
             </span>
