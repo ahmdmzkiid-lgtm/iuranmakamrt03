@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import WargaLayout from '../../components/warga/WargaLayout'
 import api from '../../services/api'
+import usePushNotifications from '../../hooks/usePushNotifications'
 
 export default function WargaSetelan() {
   const navigate = useNavigate()
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [notifMessage, setNotifMessage] = useState('')
   const [form, setForm] = useState({
     namaLengkap: '',
     nomorKK: '',
@@ -16,6 +18,15 @@ export default function WargaSetelan() {
     anggotaKeluarga: [],
   })
   const [newAnggota, setNewAnggota] = useState({ nama: '', nik: '' })
+  
+  const { 
+    isSupported: pushSupported, 
+    isSubscribed: pushSubscribed, 
+    permission: pushPermission,
+    loading: pushLoading, 
+    subscribe: subscribePush, 
+    unsubscribe: unsubscribePush 
+  } = usePushNotifications()
 
   useEffect(() => {
     const fetchProfil = async () => {
@@ -409,6 +420,76 @@ export default function WargaSetelan() {
                 </div>
                 <span className="material-symbols-outlined">chevron_right</span>
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Notifikasi Section */}
+        {!isEditing && (
+          <div className="bg-white border-4 border-black neubrutal-shadow-lg mb-6">
+            <div className="border-b-4 border-black p-4 md:p-md bg-zinc-100 flex items-center gap-3">
+              <span className="material-symbols-outlined text-2xl">notifications</span>
+              <h2 className="font-headline-md uppercase text-base md:text-headline-md">Notifikasi</h2>
+            </div>
+            <div className="p-4 md:p-md space-y-4">
+              {!pushSupported ? (
+                <div className="bg-zinc-100 border-2 border-black p-4 text-sm">
+                  <p className="text-zinc-600">Browser Anda tidak mendukung push notification.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="material-symbols-outlined">
+                        {pushSubscribed ? 'notifications_active' : 'notifications_off'}
+                      </span>
+                      <div>
+                        <p className="font-label-bold uppercase text-sm">Push Notification</p>
+                        <p className="text-xs text-zinc-500">
+                          {pushSubscribed ? 'Aktif - Anda akan menerima notifikasi' : 'Nonaktif - Aktifkan untuk menerima pengingat'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          if (pushSubscribed) {
+                            await unsubscribePush()
+                            setNotifMessage('Notifikasi dinonaktifkan')
+                          } else {
+                            await subscribePush()
+                            setNotifMessage('Notifikasi diaktifkan!')
+                          }
+                          setTimeout(() => setNotifMessage(''), 3000)
+                        } catch (error) {
+                          setNotifMessage(error.message || 'Gagal mengubah pengaturan notifikasi')
+                          setTimeout(() => setNotifMessage(''), 3000)
+                        }
+                      }}
+                      disabled={pushLoading}
+                      className={`px-4 py-2 border-2 border-black font-label-bold uppercase text-xs transition-all ${
+                        pushSubscribed 
+                          ? 'bg-zinc-200 hover:bg-zinc-300' 
+                          : 'bg-primary text-white hover:bg-primary/90'
+                      } ${pushLoading ? 'opacity-50' : ''}`}
+                    >
+                      {pushLoading ? '...' : pushSubscribed ? 'Nonaktifkan' : 'Aktifkan'}
+                    </button>
+                  </div>
+                  {pushPermission === 'denied' && (
+                    <div className="bg-error-container border-2 border-black p-3 text-sm">
+                      <p className="text-error">Izin notifikasi ditolak. Silakan aktifkan di pengaturan browser.</p>
+                    </div>
+                  )}
+                  {notifMessage && (
+                    <div className={`border-2 border-black p-3 text-sm ${
+                      notifMessage.includes('diaktifkan') ? 'bg-tertiary-container' : 'bg-error-container'
+                    }`}>
+                      <p>{notifMessage}</p>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         )}

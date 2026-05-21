@@ -17,6 +17,7 @@ model User {
   role      String   // admin | warga
   warga     Warga?
   notifications Notification[]
+  pushSubscriptions PushSubscription[]
   createdAt DateTime @default(now())
 }
 
@@ -75,4 +76,14 @@ model Setting {
   id    Int    @id @default(autoincrement())
   key   String @unique
   value String
+}
+
+model PushSubscription {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
 }

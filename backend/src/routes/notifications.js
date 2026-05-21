@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { verifyToken } from '../middleware/auth.js'
 import { requireRole } from '../middleware/role.js'
 import { PrismaClient } from '@prisma/client'
+import { sendPushNotification, sendPushToMultipleUsers, VAPID_PUBLIC_KEY } from '../services/pushNotification.js'
 
 const router = Router()
 const prisma = new PrismaClient()
@@ -10,6 +11,67 @@ const getBulanName = (bln) => {
   const bulan = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
   return bulan[bln - 1] || bln
 }
+
+// Get VAPID public key for frontend
+router.get('/vapid-public-key', (req, res) => {
+  res.json({ publicKey: VAPID_PUBLIC_KEY })
+})
+
+// Subscribe to push notifications
+router.post('/subscribe', verifyToken, async (req, res) => {
+  try {
+    const { endpoint, keys } = req.body
+    const userId = req.user.id
+
+    if (!endpoint || !keys?.p256dh || !keys?.auth) {
+      return res.status(400).json({ error: 'Invalid subscription data' })
+    }
+
+    // Upsert subscription (update if exists, create if not)
+    await prisma.pushSubscription.upsert({
+      where: { endpoint },
+      update: {
+        p256dh: keys.p256dh,
+        auth: keys.auth,
+        userId
+      },
+      create: {
+        userId,
+        endpoint,
+        p256dh: keys.p256dh,
+        auth: keys.auth
+      }
+    })
+
+    res.json({ message: 'Berhasil berlangganan notifikasi' })
+  } catch (error) {
+    console.error('Error subscribing to push:', error)
+    res.status(500).json({ error: 'Gagal berlangganan notifikasi' })
+  }
+})
+
+// Unsubscribe from push notifications
+router.post('/unsubscribe', verifyToken, async (req, res) => {
+  try {
+    const { endpoint } = req.body
+
+    if (endpoint) {
+      await prisma.pushSubscription.deleteMany({
+        where: { endpoint, userId: req.user.id }
+      })
+    } else {
+      // Delete all subscriptions for this user
+      await prisma.pushSubscription.deleteMany({
+        where: { userId: req.user.id }
+      })
+    }
+
+    res.json({ message: 'Berhasil berhenti berlangganan notifikasi' })
+  } catch (error) {
+    console.error('Error unsubscribing:', error)
+    res.status(500).json({ error: 'Gagal berhenti berlangganan' })
+  }
+})
 
 // Ambil notifikasi milik user
 router.get('/', verifyToken, async (req, res) => {
@@ -70,22 +132,26 @@ router.post('/send-reminder', verifyToken, requireRole('admin'), async (req, res
       include: { user: true }
     })
 
-    const notifications = []
-    for (const warga of wargaList) {
-      const defaultMessage = `Pengingat: Tagihan iuran bulan ${getBulanName(currentMonth)} ${currentYear} belum dibayar. Mohon segera melakukan pembayaran.`
-      
-      notifications.push({
-        userId: warga.userId,
-        title: '📢 Pengingat Tagihan Iuran',
-        message: message || defaultMessage
-      })
-    }
+    const title = '📢 Pengingat Tagihan Iuran'
+    const defaultMessage = `Pengingat: Tagihan iuran bulan ${getBulanName(currentMonth)} ${currentYear} belum dibayar. Mohon segera melakukan pembayaran.`
+    const finalMessage = message || defaultMessage
+
+    const notifications = wargaList.map(warga => ({
+      userId: warga.userId,
+      title,
+      message: finalMessage
+    }))
 
     await prisma.notification.createMany({ data: notifications })
 
+    // Send push notifications
+    const userIds = wargaList.map(w => w.userId)
+    const pushResult = await sendPushToMultipleUsers(userIds, title, finalMessage, '/warga/tagihan')
+
     res.json({ 
       message: `Pengingat berhasil dikirim ke ${notifications.length} warga`,
-      count: notifications.length
+      count: notifications.length,
+      pushSent: pushResult.sent
     })
   } catch (error) {
     console.error('Error sending reminder:', error)
@@ -118,19 +184,26 @@ router.post('/send-reminder-unpaid', verifyToken, requireRole('admin'), async (r
       return res.json({ message: 'Semua warga sudah membayar iuran bulan ini', count: 0 })
     }
 
+    const title = '📢 Pengingat Tagihan Iuran'
     const defaultMessage = `Pengingat: Tagihan iuran bulan ${getBulanName(currentMonth)} ${currentYear} belum dibayar. Mohon segera melakukan pembayaran.`
+    const finalMessage = message || defaultMessage
 
     const notifications = unpaidWarga.map(w => ({
       userId: w.userId,
-      title: '📢 Pengingat Tagihan Iuran',
-      message: message || defaultMessage
+      title,
+      message: finalMessage
     }))
 
     await prisma.notification.createMany({ data: notifications })
 
+    // Send push notifications
+    const userIds = unpaidWarga.map(w => w.userId)
+    const pushResult = await sendPushToMultipleUsers(userIds, title, finalMessage, '/warga/tagihan')
+
     res.json({ 
       message: `Pengingat berhasil dikirim ke ${notifications.length} warga yang belum bayar`,
-      count: notifications.length
+      count: notifications.length,
+      pushSent: pushResult.sent
     })
   } catch (error) {
     console.error('Error sending reminder to unpaid:', error)
@@ -169,9 +242,14 @@ router.post('/send-custom', verifyToken, requireRole('admin'), async (req, res) 
 
     await prisma.notification.createMany({ data: notifications })
 
+    // Send push notifications
+    const userIds = targetWarga.map(w => w.userId)
+    const pushResult = await sendPushToMultipleUsers(userIds, title, message, '/warga')
+
     res.json({ 
       message: `Notifikasi berhasil dikirim ke ${notifications.length} warga`,
-      count: notifications.length
+      count: notifications.length,
+      pushSent: pushResult.sent
     })
   } catch (error) {
     console.error('Error sending custom notification:', error)
