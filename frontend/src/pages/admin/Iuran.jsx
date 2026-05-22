@@ -35,6 +35,10 @@ export default function AdminIuran() {
   const [wargaSearch, setWargaSearch] = useState('')
   const [showWargaDropdown, setShowWargaDropdown] = useState(false)
   
+  // Delete Offline States
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  
   // Export Modal States
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportBulan, setExportBulan] = useState(new Date().getMonth() + 1)
@@ -136,6 +140,23 @@ export default function AdminIuran() {
     } catch (error) {
       console.error('Reject error', error)
       showAlert('Gagal menolak pembayaran')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleDeleteOffline = async () => {
+    if (!deleteTarget) return
+    try {
+      setIsProcessing(true)
+      await api.delete(`/iuran/admin/${deleteTarget.id}`)
+      await showAlert('Pembayaran offline berhasil dihapus!')
+      setShowDeleteModal(false)
+      setDeleteTarget(null)
+      fetchData()
+    } catch (error) {
+      console.error('Delete offline error', error)
+      showAlert(error.response?.data?.message || 'Gagal menghapus pembayaran')
     } finally {
       setIsProcessing(false)
     }
@@ -937,7 +958,21 @@ export default function AdminIuran() {
                             Bulan {getBulanName(row.bulan)} {row.tahun} • {row.metode || 'Offline'}
                           </p>
                         </div>
-                        <p className="font-mono font-bold text-xs shrink-0">{formatRp(row.jumlah)}</p>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <p className="font-mono font-bold text-xs">{formatRp(row.jumlah)}</p>
+                          {row.metode === 'Tunai (Offline)' && row.status === 'lunas' && (
+                            <button
+                              onClick={() => {
+                                setDeleteTarget(row)
+                                setShowDeleteModal(true)
+                              }}
+                              className="w-7 h-7 border-2 border-black bg-error/10 hover:bg-error hover:text-white text-error flex items-center justify-center transition-all cursor-pointer"
+                              title="Hapus pembayaran offline"
+                            >
+                              <span className="material-symbols-outlined text-sm">delete</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))
                   )}
@@ -1133,7 +1168,21 @@ export default function AdminIuran() {
                             Bayar {row.jumlahBulan} bulan ({row.jumlahOrang} Orang) • {row.metode || 'Offline'}
                           </p>
                         </div>
-                        <p className="font-mono font-bold text-xs shrink-0">{formatRp(row.jumlah)}</p>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <p className="font-mono font-bold text-xs">{formatRp(row.jumlah)}</p>
+                          {row.metode === 'Tunai (Offline)' && row.status === 'lunas' && (
+                            <button
+                              onClick={() => {
+                                setDeleteTarget(row)
+                                setShowDeleteModal(true)
+                              }}
+                              className="w-7 h-7 border-2 border-black bg-error/10 hover:bg-error hover:text-white text-error flex items-center justify-center transition-all cursor-pointer"
+                              title="Hapus pembayaran offline"
+                            >
+                              <span className="material-symbols-outlined text-sm">delete</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))
                   )}
@@ -1393,6 +1442,67 @@ export default function AdminIuran() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Konfirmasi Hapus Pembayaran Offline */}
+        {showDeleteModal && deleteTarget && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white border-4 border-black w-full max-w-md neubrutal-shadow">
+              <div className="p-4 border-b-4 border-black bg-error text-white flex justify-between items-center">
+                <h2 className="font-display-bold text-lg uppercase flex items-center gap-2">
+                  <span className="material-symbols-outlined">delete_forever</span>
+                  Hapus Pembayaran Offline
+                </h2>
+                <button onClick={() => { setShowDeleteModal(false); setDeleteTarget(null) }} className="hover:text-black transition-colors">
+                  <span className="material-symbols-outlined text-2xl">close</span>
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="bg-error/5 border-2 border-error/20 p-4 space-y-2">
+                  <p className="font-bold text-sm text-error uppercase">⚠ Perhatian: Data yang dihapus tidak bisa dikembalikan!</p>
+                  <p className="text-xs text-zinc-600">Anda yakin ingin menghapus pembayaran offline berikut?</p>
+                </div>
+                <div className="bg-zinc-50 border-2 border-black p-4 space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="font-bold text-zinc-500 uppercase">Nama Warga</span>
+                    <span className="font-bold">{deleteTarget.warga?.user?.nama}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="font-bold text-zinc-500 uppercase">Tipe</span>
+                    <span className="font-bold uppercase">{deleteTarget.tipe === 'warga' ? 'Iuran Warga' : 'Iuran Makam'}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="font-bold text-zinc-500 uppercase">Detail</span>
+                    <span className="font-bold">
+                      {deleteTarget.tipe === 'warga' 
+                        ? `${getBulanName(deleteTarget.bulan)} ${deleteTarget.tahun}` 
+                        : `${deleteTarget.jumlahBulan} Bulan (${deleteTarget.jumlahOrang} Orang)`}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs border-t border-black/10 pt-2 mt-2">
+                    <span className="font-bold text-zinc-500 uppercase">Jumlah</span>
+                    <span className="font-display-bold text-error">{formatRp(deleteTarget.jumlah)}</span>
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => { setShowDeleteModal(false); setDeleteTarget(null) }}
+                    className="flex-1 py-3 border-4 border-black font-headline-md uppercase text-sm hover:bg-zinc-100 cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    onClick={handleDeleteOffline}
+                    disabled={isProcessing}
+                    className="flex-1 py-3 bg-error text-white border-4 border-black font-headline-md uppercase text-sm neubrutal-shadow active-press disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-sm">delete_forever</span>
+                    {isProcessing ? 'Menghapus...' : 'Hapus Permanen'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}

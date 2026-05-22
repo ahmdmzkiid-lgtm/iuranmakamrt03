@@ -698,6 +698,50 @@ router.post('/admin/bayar-semua', verifyToken, async (req, res) => {
   }
 })
 
+// ==================== ADMIN HAPUS PEMBAYARAN OFFLINE ====================
+
+// Admin hapus pembayaran offline (koreksi salah input)
+router.delete('/admin/:id', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' })
+
+    const id = parseInt(req.params.id)
+    const iuran = await prisma.iuran.findUnique({
+      where: { id },
+      include: { warga: { include: { user: true } } }
+    })
+
+    if (!iuran) return res.status(404).json({ message: 'Data iuran tidak ditemukan' })
+
+    // Hanya boleh hapus pembayaran offline (Tunai)
+    if (iuran.metode !== 'Tunai (Offline)') {
+      return res.status(400).json({ message: 'Hanya pembayaran offline (tunai) yang bisa dihapus' })
+    }
+
+    // Jika tipe makam, kurangi bulanMakamTerbayar
+    if (iuran.tipe === 'makam' && iuran.jumlahBulan) {
+      await prisma.warga.update({
+        where: { id: iuran.wargaId },
+        data: { 
+          bulanMakamTerbayar: { 
+            decrement: iuran.jumlahBulan 
+          } 
+        }
+      })
+    }
+
+    // Hapus record iuran
+    await prisma.iuran.delete({ where: { id } })
+
+    res.json({ 
+      message: `Pembayaran offline ${iuran.tipe === 'warga' ? 'iuran warga' : 'iuran makam'} berhasil dihapus` 
+    })
+  } catch (error) {
+    console.error('Error DELETE admin iuran:', error)
+    res.status(500).json({ message: 'Internal server error' })
+  }
+})
+
 // ==================== STATISTIK ====================
 
 router.get('/statistik', verifyToken, async (req, res) => {
