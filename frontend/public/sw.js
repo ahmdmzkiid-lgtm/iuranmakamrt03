@@ -37,18 +37,25 @@ self.addEventListener('activate', (event) => {
 
 // Fetch event: apply caching strategies
 self.addEventListener('fetch', (event) => {
+  // Only handle GET requests. Non-GET requests (POST, PUT, DELETE) cannot be cached.
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
   const requestUrl = new URL(event.request.url);
 
   // Strategy 1: Network First for API calls (backend)
-  const isApiRequest = requestUrl.pathname.startsWith('/auth') || 
-                       requestUrl.pathname.startsWith('/warga') || 
-                       requestUrl.pathname.startsWith('/makam') || 
-                       requestUrl.pathname.startsWith('/iuran') || 
-                       requestUrl.pathname.startsWith('/laporan') || 
-                       requestUrl.pathname.startsWith('/settings') || 
-                       requestUrl.pathname.startsWith('/notifications') ||
-                       event.request.url.includes('render.com') ||
-                       event.request.url.includes('localhost:3000');
+  // Check if it is a backend API call (on a different origin and matching backend paths, or matching Render/localhost:3000)
+  const isApiRequest = (requestUrl.origin !== self.location.origin ||
+                        event.request.url.includes('render.com') ||
+                        event.request.url.includes('localhost:3000')) &&
+                       (requestUrl.pathname.startsWith('/auth') || 
+                        requestUrl.pathname.startsWith('/warga') || 
+                        requestUrl.pathname.startsWith('/makam') || 
+                        requestUrl.pathname.startsWith('/iuran') || 
+                        requestUrl.pathname.startsWith('/laporan') || 
+                        requestUrl.pathname.startsWith('/settings') || 
+                        requestUrl.pathname.startsWith('/notifications'));
 
   if (isApiRequest) {
     event.respondWith(

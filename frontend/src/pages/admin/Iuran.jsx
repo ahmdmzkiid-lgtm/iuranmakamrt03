@@ -112,7 +112,10 @@ export default function AdminIuran() {
       if (isTransaksi) {
         await api.put(`/iuran/verifikasi-transaksi/${id}`, { action })
       } else {
-        await api.put(`/iuran/${id}/verifikasi`, { action })
+        const cleanId = typeof id === 'string' && id.startsWith('SINGLE-')
+          ? id.replace('SINGLE-', '')
+          : id
+        await api.put(`/iuran/${cleanId}/verifikasi`, { action })
       }
       await showAlert('Pembayaran berhasil diverifikasi!')
       fetchData()
@@ -128,11 +131,14 @@ export default function AdminIuran() {
     if (!rejectReason) return showAlert('Mohon isi alasan penolakan')
     try {
       setIsProcessing(true)
-      const isTx = typeof rejectId === 'string'
+      const isTx = typeof rejectId === 'string' && !rejectId.startsWith('SINGLE-')
       if (isTx) {
         await api.put(`/iuran/verifikasi-transaksi/${rejectId}`, { action: 'tolak', alasan: rejectReason })
       } else {
-        await api.put(`/iuran/${rejectId}/verifikasi`, { action: 'tolak', alasan: rejectReason })
+        const cleanId = typeof rejectId === 'string' && rejectId.startsWith('SINGLE-')
+          ? rejectId.replace('SINGLE-', '')
+          : rejectId
+        await api.put(`/iuran/${cleanId}/verifikasi`, { action: 'tolak', alasan: rejectReason })
       }
       await showAlert('Pembayaran ditolak.')
       setShowRejectModal(false)
