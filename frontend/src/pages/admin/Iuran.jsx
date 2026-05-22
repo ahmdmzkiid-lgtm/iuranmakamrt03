@@ -278,11 +278,44 @@ export default function AdminIuran() {
         return (payDate.getMonth() + 1) === selectedMonth && payDate.getFullYear() === selectedYear
       })
 
-      // Cari Warga yang belum bayar IURAN WARGA untuk bulan dan tahun yang dipilih
-      const paidWargaIds = new Set(
-        lunasIurans.filter(i => i.tipe === 'warga').map(i => i.wargaId)
-      )
-      
+      // Group lunas payments by wargaId to prevent duplicate KK rows
+      const groupedLunas = {}
+      lunasIurans.forEach(row => {
+        const wId = row.wargaId
+        if (!groupedLunas[wId]) {
+          groupedLunas[wId] = {
+            warga: row.warga,
+            totalMakam: 0,
+            totalWarga: 0,
+            totalJumlah: 0,
+            metodes: new Set(),
+            tanggalBayars: [],
+            makamPeriodes: [],
+            wargaPeriodes: []
+          }
+        }
+        
+        const group = groupedLunas[wId]
+        if (row.tipe === 'makam') {
+          group.totalMakam += Number(row.jumlah)
+          group.makamPeriodes.push(`Makam (${row.jumlahBulan || 1} Bulan)`)
+        } else if (row.tipe === 'warga') {
+          group.totalWarga += Number(row.jumlah)
+          group.wargaPeriodes.push(`${getBulanName(row.bulan)} ${row.tahun}`)
+        }
+        group.totalJumlah += Number(row.jumlah)
+        if (row.metode) {
+          group.metodes.add(row.metode)
+        }
+        
+        const dateObj = row.tanggalBayar ? new Date(row.tanggalBayar) : (row.createdAt ? new Date(row.createdAt) : null)
+        if (dateObj) {
+          group.tanggalBayars.push(dateObj)
+        }
+      })
+
+      // Warga who have not paid anything (neither warga nor makam) in this month/year
+      const paidWargaIds = new Set(Object.keys(groupedLunas).map(id => Number(id)))
       const unpaidWarga = wargaList.filter(w => !paidWargaIds.has(w.id))
 
       let totalSumMakam = 0
@@ -290,17 +323,30 @@ export default function AdminIuran() {
       let totalSumGrand = 0
       let rowIdxCounter = 1
 
+      // Sort alphabetically by KK name (Kepala Keluarga)
+      const sortedGroupedLunas = Object.values(groupedLunas).sort((a, b) => {
+        const nameA = a.warga?.user?.nama || ''
+        const nameB = b.warga?.user?.nama || ''
+        return nameA.localeCompare(nameB, 'id', { sensitivity: 'base' })
+      })
+
+      const sortedUnpaidWarga = [...unpaidWarga].sort((a, b) => {
+        const nameA = a.user?.nama || ''
+        const nameB = b.user?.nama || ''
+        return nameA.localeCompare(nameB, 'id', { sensitivity: 'base' })
+      })
+
       // 4. Populate "SUDAH BAYAR" Rows
-      lunasIurans.forEach((row) => {
+      sortedGroupedLunas.forEach((group) => {
         const namesList = []
         const niksList = []
 
-        const kkNama = row.warga?.user?.nama || ''
-        const kkNik = row.warga?.user?.nik || ''
+        const kkNama = group.warga?.user?.nama || ''
+        const kkNik = group.warga?.user?.nik || ''
         namesList.push(kkNama)
         niksList.push(kkNik || '-')
 
-        const famList = Array.isArray(row.warga?.anggotaKeluarga) ? row.warga.anggotaKeluarga : []
+        const famList = Array.isArray(group.warga?.anggotaKeluarga) ? group.warga.anggotaKeluarga : []
         famList.forEach(m => {
           namesList.push(m.nama || '')
           niksList.push(m.nik || '-')
@@ -309,32 +355,46 @@ export default function AdminIuran() {
         const namesString = namesList.join('\r\n')
         const niksString = niksList.join('\r\n')
 
-        const isMakam = row.tipe === 'makam'
-        const isWarga = row.tipe === 'warga'
-        const nominalMakam = isMakam ? Number(row.jumlah) : 0
-        const nominalWarga = isWarga ? Number(row.jumlah) : 0
+        const nominalMakam = group.totalMakam
+        const nominalWarga = group.totalWarga
 
         totalSumMakam += nominalMakam
         totalSumWarga += nominalWarga
-        totalSumGrand += Number(row.jumlah)
+        totalSumGrand += group.totalJumlah
 
         const dataRow = worksheet.getRow(5 + rowIdxCounter - 1)
         dataRow.getCell(1).value = rowIdxCounter // NO
-        dataRow.getCell(2).value = row.warga?.user?.nomorKK || '-' // NO KK
+        dataRow.getCell(2).value = group.warga?.user?.nomorKK || '-' // NO KK
         dataRow.getCell(3).value = namesString // NAMA
         dataRow.getCell(4).value = niksString // NIK
-        dataRow.getCell(5).value = nominalMakam // IURAN MAKAM
-        dataRow.getCell(6).value = nominalWarga // IURAN WARGA
-        dataRow.getCell(7).value = isWarga 
-          ? `${getBulanName(row.bulan)} ${row.tahun}` 
-          : `Makam (${row.jumlahBulan || 1} Bulan)` // PERIODE (only Makam (X Bulan) as requested!)
-        dataRow.getCell(8).value = Number(row.jumlah) // JUMLAH
-        dataRow.getCell(9).value = row.metode || '-' // METODE
-        dataRow.getCell(10).value = row.tanggalBayar ? new Date(row.tanggalBayar).toLocaleDateString('id-ID') : '-' // TANGGAL BAYAR
+        dataRow.getCell(5).value = nominalMakam > 0 ? nominalMakam : 0 // IURAN MAKAM
+        dataRow.getCell(6).value = nominalWarga > 0 ? nominalWarga : 0 // IURAN WARGA
+        
+        // Consistent format: Makam first, then Warga, separated by ' / '
+        const periodParts = []
+        if (group.makamPeriodes.length > 0) {
+          periodParts.push(group.makamPeriodes.join(', '))
+        }
+        if (group.wargaPeriodes.length > 0) {
+          periodParts.push(group.wargaPeriodes.join(', '))
+        }
+        dataRow.getCell(7).value = periodParts.length > 0 ? periodParts.join(' / ') : '-' // PERIODE
+        dataRow.getCell(8).value = group.totalJumlah // JUMLAH
+        dataRow.getCell(9).value = Array.from(group.metodes).join(', ') || '-' // METODE
+        
+        const formattedDates = group.tanggalBayars
+          .map(d => d.toLocaleDateString('id-ID'))
+          .filter((v, i, self) => self.indexOf(v) === i)
+          .join(', ')
+        dataRow.getCell(10).value = formattedDates || '-' // TANGGAL BAYAR
 
-        // Format all cells to CENTER as requested
+        // Format all cells: NAMA left-aligned, others center-aligned
         for (let col = 1; col <= 10; col++) {
-          dataRow.getCell(col).alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
+          dataRow.getCell(col).alignment = { 
+            vertical: 'middle', 
+            horizontal: col === 3 ? 'left' : 'center', 
+            wrapText: true 
+          }
           dataRow.getCell(col).border = {
             top: { style: 'thin' },
             left: { style: 'thin' },
@@ -352,7 +412,7 @@ export default function AdminIuran() {
       })
 
       // 5. Populate "BELUM BAYAR" Rows (below the paid ones)
-      unpaidWarga.forEach((w) => {
+      sortedUnpaidWarga.forEach((w) => {
         const namesList = []
         const niksList = []
 
@@ -375,16 +435,20 @@ export default function AdminIuran() {
         dataRow.getCell(2).value = w.user?.nomorKK || '-' // NO KK
         dataRow.getCell(3).value = namesString // NAMA
         dataRow.getCell(4).value = niksString // NIK
-        dataRow.getCell(5).value = '-' // IURAN MAKAM (dikosongkan dengan '-')
-        dataRow.getCell(6).value = '-' // IURAN WARGA (dikosongkan dengan '-')
+        dataRow.getCell(5).value = '-' // IURAN MAKAM
+        dataRow.getCell(6).value = '-' // IURAN WARGA
         dataRow.getCell(7).value = `${getBulanName(selectedMonth)} ${selectedYear} (BELUM BAYAR)` // PERIODE
         dataRow.getCell(8).value = '-' // JUMLAH
         dataRow.getCell(9).value = '-' // METODE
         dataRow.getCell(10).value = '-' // TANGGAL BAYAR
 
-        // Format all cells to CENTER and thin borders
+        // Format all cells: NAMA left-aligned, others center-aligned
         for (let col = 1; col <= 10; col++) {
-          dataRow.getCell(col).alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
+          dataRow.getCell(col).alignment = { 
+            vertical: 'middle', 
+            horizontal: col === 3 ? 'left' : 'center', 
+            wrapText: true 
+          }
           dataRow.getCell(col).border = {
             top: { style: 'thin' },
             left: { style: 'thin' },

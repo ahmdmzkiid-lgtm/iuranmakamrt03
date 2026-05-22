@@ -141,9 +141,13 @@ export default function AdminMakam() {
         dataRow.getCell(4).value = w.alamat || '-'
         dataRow.getCell(5).value = progressString
 
-        // Center alignment and borders for all cells (centered as requested)
+        // Alignment and borders for all cells (NAMA is left-aligned, others are centered)
         for (let col = 1; col <= 5; col++) {
-          dataRow.getCell(col).alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
+          dataRow.getCell(col).alignment = { 
+            vertical: 'middle', 
+            horizontal: col === 2 ? 'left' : 'center', 
+            wrapText: true 
+          }
           dataRow.getCell(col).border = {
             top: { style: 'thin' },
             left: { style: 'thin' },

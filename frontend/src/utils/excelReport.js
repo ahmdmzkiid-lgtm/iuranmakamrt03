@@ -110,10 +110,15 @@ export const generateExcelReport = async (wargaData, iuranData, targetMonth, tar
     });
     
     // Style kepala keluarga row (bold, light green background)
-    kepalaRow.eachCell((cell) => {
+    kepalaRow.eachCell((cell, colNumber) => {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: kepalaKKColor } };
       cell.font = { bold: true };
       cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      cell.alignment = { 
+        vertical: 'middle', 
+        horizontal: colNumber === 3 ? 'left' : 'center', 
+        wrapText: true 
+      };
     });
     kepalaRow.getCell('jumlah').numFmt = '#,##0';
     
@@ -133,11 +138,16 @@ export const generateExcelReport = async (wargaData, iuranData, targetMonth, tar
         status: '',
       });
       
-      anggotaRow.eachCell((cell) => {
+      anggotaRow.eachCell((cell, colNumber) => {
         cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        cell.alignment = { 
+          vertical: 'middle', 
+          horizontal: colNumber === 3 ? 'left' : 'center', 
+          wrapText: true 
+        };
       });
       // Indent anggota nama
-      anggotaRow.getCell('nama').alignment = { indent: 2 };
+      anggotaRow.getCell('nama').alignment = { indent: 2, vertical: 'middle', horizontal: 'left' };
     });
   });
 
@@ -351,16 +361,18 @@ export const generateTransactionReport = async (dataIuran, wargaData, selectedBu
       // Center alignment for all columns except NAMA (column 2) and NIK (column 3)
       if (colNumber !== 2 && colNumber !== 3) {
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      } else {
+        cell.alignment = { vertical: 'middle', horizontal: 'left' };
       }
     });
 
     if (typeof iuranWargaJumlah === 'number' && iuranWargaJumlah > 0) row.getCell('iuranWarga').numFmt = '#,##0';
     if (typeof iuranMakamJumlah === 'number' && iuranMakamJumlah > 0) row.getCell('iuranMakam').numFmt = '#,##0';
     row.getCell('jumlah').numFmt = '#,##0';
-    row.getCell('nama').alignment = { wrapText: true, vertical: 'middle' };
+    row.getCell('nama').alignment = { wrapText: true, vertical: 'middle', horizontal: 'left' };
     // Force NIK to be text format to preserve all 16 digits
     row.getCell('nik').numFmt = '@';
-    row.getCell('nik').alignment = { wrapText: true, vertical: 'middle' };
+    row.getCell('nik').alignment = { wrapText: true, vertical: 'middle', horizontal: 'left' };
   });
 
   // --- SHEET 2: RINGKASAN ---
