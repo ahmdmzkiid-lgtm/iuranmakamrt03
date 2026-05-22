@@ -18,8 +18,31 @@ export default function WargaRiwayat() {
       try {
         setLoading(true)
         const res = await api.get('/iuran')
-        // Tampilkan semua iuran
-        setHistory(res.data.reverse())
+        
+        // Filter out duplicate 'belum_bayar' items if they have already been paid (lunas or pending)
+        const rawData = res.data.reverse()
+        const filtered = rawData.filter((item, index, self) => {
+          if (item.status === 'belum_bayar') {
+            if (item.tipe === 'warga') {
+              const isPaid = self.some(h => 
+                h.tipe === 'warga' && 
+                h.bulan === item.bulan && 
+                h.tahun === item.tahun && 
+                (h.status === 'lunas' || h.status === 'pending')
+              )
+              if (isPaid) return false
+            } else if (item.tipe === 'makam') {
+              const isPaid = self.some(h => 
+                h.tipe === 'makam' && 
+                (h.status === 'lunas' || h.status === 'pending')
+              )
+              if (isPaid) return false
+            }
+          }
+          return true
+        })
+
+        setHistory(filtered)
       } catch (error) {
         console.error('Failed to fetch history:', error)
       } finally {

@@ -34,39 +34,75 @@ export default function WargaKuitansi() {
             grouped[key] = {
               ...item,
               nominal: 0,
-              bulanList: [],
+              items: [],
               isGrouped: !!item.transaksiId
             }
           }
           grouped[key].nominal += Number(item.jumlah)
-          grouped[key].bulanList.push({ bulan: item.bulan, tahun: item.tahun })
+          grouped[key].items.push(item)
         })
 
         const formatted = Object.values(grouped).map(item => {
-          // Sort bulanList
-          item.bulanList.sort((a, b) => (a.tahun - b.tahun) || (a.bulan - b.bulan))
+          const wargaItems = item.items.filter(i => i.tipe === 'warga')
+          const makamItems = item.items.filter(i => i.tipe === 'makam')
           
-          let periodeStr = `${getBulanName(item.bulanList[0].bulan)} ${item.bulanList[0].tahun}`
-          if (item.bulanList.length > 1) {
-            const last = item.bulanList[item.bulanList.length - 1]
-            periodeStr += ` - ${getBulanName(last.bulan)} ${last.tahun}`
+          let jenis = ''
+          let icon = ''
+          let periodeStr = ''
+          
+          if (wargaItems.length > 0 && makamItems.length > 0) {
+            jenis = 'Iuran Warga + Iuran Makam'
+            icon = 'payments'
+            
+            // Warga period
+            wargaItems.sort((a, b) => (a.tahun - b.tahun) || (a.bulan - b.bulan))
+            let wargaPeriode = `${getBulanName(wargaItems[0].bulan)} ${wargaItems[0].tahun}`
+            if (wargaItems.length > 1) {
+              const last = wargaItems[wargaItems.length - 1]
+              wargaPeriode += ` - ${getBulanName(last.bulan)} ${last.tahun}`
+            }
+            
+            // Makam period
+            const totalMakamBulan = makamItems.reduce((sum, i) => sum + (i.jumlahBulan || 0), 0)
+            periodeStr = `${wargaPeriode} / Makam (${totalMakamBulan} bulan)`
+          } else if (wargaItems.length > 0) {
+            jenis = 'Iuran Warga'
+            icon = 'groups'
+            
+            wargaItems.sort((a, b) => (a.tahun - b.tahun) || (a.bulan - b.bulan))
+            periodeStr = `${getBulanName(wargaItems[0].bulan)} ${wargaItems[0].tahun}`
+            if (wargaItems.length > 1) {
+              const last = wargaItems[wargaItems.length - 1]
+              periodeStr += ` - ${getBulanName(last.bulan)} ${last.tahun}`
+            }
+          } else {
+            jenis = 'Iuran Makam'
+            icon = 'deceased'
+            
+            const totalMakamBulan = makamItems.reduce((sum, i) => sum + (i.jumlahBulan || 0), 0)
+            periodeStr = `Makam (${totalMakamBulan} bulan)`
           }
+
+          const wargaNominal = wargaItems.reduce((sum, i) => sum + Number(i.jumlah), 0)
+          const makamNominal = makamItems.reduce((sum, i) => sum + Number(i.jumlah), 0)
 
           return {
             id: item.transaksiId || `KWT-${item.tahun}-${String(item.bulan).padStart(2, '0')}-${item.id}`,
             invoiceId: item.transaksiId || `INV-${item.id}`,
             tipe: item.tipe,
-            jenis: item.tipe === 'warga' ? 'Iuran Warga' : 'Iuran Makam',
+            jenis,
             bulan: periodeStr,
             nominal: item.nominal,
+            wargaNominal,
+            makamNominal,
             metode: item.metode || 'Transfer',
             noRef: item.transaksiId || `REF-${item.id}-${Math.floor(Math.random() * 10000)}`,
             tanggalBayar: item.tanggalBayar ? new Date(item.tanggalBayar).toLocaleDateString('id-ID') : '-',
             tanggalVerifikasi: item.tanggalBayar ? new Date(item.tanggalBayar).toLocaleDateString('id-ID') : '-',
             diverifikasiOleh: 'Admin RT',
             status: 'lunas',
-            icon: item.tipe === 'warga' ? 'groups' : 'deceased',
-            isMultiMonth: item.bulanList.length > 1,
+            icon,
+            isMultiMonth: wargaItems.length > 1,
             namaWarga: item.warga?.user?.nama || 'Warga'
           }
         })
@@ -434,9 +470,7 @@ export default function WargaKuitansi() {
                     <span className="text-zinc-600 font-bold">Iuran Warga</span>
                     <span className="font-bold">
                       {formatRp(
-                        kuitansiData
-                          .filter((k) => k.jenis === 'Iuran Warga')
-                          .reduce((s, k) => s + k.nominal, 0)
+                        kuitansiData.reduce((s, k) => s + (k.wargaNominal || 0), 0)
                       )}
                     </span>
                   </div>
@@ -444,9 +478,7 @@ export default function WargaKuitansi() {
                     <span className="text-zinc-600 font-bold">Iuran Makam</span>
                     <span className="font-bold">
                       {formatRp(
-                        kuitansiData
-                          .filter((k) => k.jenis === 'Iuran Makam')
-                          .reduce((s, k) => s + k.nominal, 0)
+                        kuitansiData.reduce((s, k) => s + (k.makamNominal || 0), 0)
                       )}
                     </span>
                   </div>
