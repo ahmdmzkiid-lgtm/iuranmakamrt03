@@ -408,6 +408,10 @@ export default function AdminIuran() {
         dataRow.getCell(6).numFmt = '#,##0'
         dataRow.getCell(8).numFmt = '#,##0'
 
+        // Explicit row height for mobile Excel compatibility
+        const lineCount = namesList.length
+        dataRow.height = Math.max(25, lineCount * 18)
+
         rowIdxCounter++
       })
 
@@ -456,6 +460,10 @@ export default function AdminIuran() {
             right: { style: 'thin' }
           }
         }
+
+        // Explicit row height for mobile Excel compatibility
+        const lineCount = namesList.length
+        dataRow.height = Math.max(25, lineCount * 18)
 
         rowIdxCounter++
       })
