@@ -1,0 +1,360 @@
+﻿diff --git a/frontend/src/pages/admin/Iuran.jsx b/frontend/src/pages/admin/Iuran.jsx
+index 0c5111c..c2fd7de 100644
+--- a/frontend/src/pages/admin/Iuran.jsx
++++ b/frontend/src/pages/admin/Iuran.jsx
+@@ -552,6 +552,25 @@ export default function AdminIuran() {
+   }, [sortedWargaProgress, wargaProgressPage])
+ 
+   const totalWargaProgressPages = Math.ceil(sortedWargaProgress.length / PAGE_SIZE) || 1
++  const wargaProgressStartIndex = sortedWargaProgress.length === 0 ? 0 : (wargaProgressPage - 1) * PAGE_SIZE + 1
++  const wargaProgressEndIndex = Math.min(wargaProgressPage * PAGE_SIZE, sortedWargaProgress.length)
++
++  const getWargaProgressPageNumbers = () => {
++    const pages = []
++    const range = 1
++    for (let i = 1; i <= totalWargaProgressPages; i++) {
++      if (
++        i === 1 ||
++        i === totalWargaProgressPages ||
++        (i >= wargaProgressPage - range && i <= wargaProgressPage + range)
++      ) {
++        pages.push(i)
++      } else if (pages[pages.length - 1] !== '...') {
++        pages.push('...')
++      }
++    }
++    return pages
++  }
+ 
+   // Filter and Paginate History
+   const filteredHistory = useMemo(() => {
+@@ -569,6 +588,25 @@ export default function AdminIuran() {
+   }, [filteredHistory, currentPage])
+ 
+   const totalPages = Math.ceil(filteredHistory.length / PAGE_SIZE) || 1
++  const historyStartIndex = filteredHistory.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
++  const historyEndIndex = Math.min(currentPage * PAGE_SIZE, filteredHistory.length)
++
++  const getHistoryPageNumbers = () => {
++    const pages = []
++    const range = 1
++    for (let i = 1; i <= totalPages; i++) {
++      if (
++        i === 1 ||
++        i === totalPages ||
++        (i >= currentPage - range && i <= currentPage + range)
++      ) {
++        pages.push(i)
++      } else if (pages[pages.length - 1] !== '...') {
++        pages.push('...')
++      }
++    }
++    return pages
++  }
+ 
+   // Reset pagination when tab/search changes
+   useEffect(() => {
+@@ -827,29 +865,58 @@ export default function AdminIuran() {
+                 </div>
+ 
+                 {/* Pagination for Warga List */}
+-                {totalWargaProgressPages > 1 && (
+-                  <div className="p-4 flex justify-between items-center bg-zinc-50 border-t-2 border-black">
+-                    <button
+-                      onClick={() => setWargaProgressPage(p => Math.max(p - 1, 1))}
+-                      disabled={wargaProgressPage === 1}
+-                      className="px-3 py-1.5 border-2 border-black bg-white font-bold text-xs uppercase hover:bg-zinc-50 active-press disabled:opacity-50"
+-                    >
+-                      Sebelumnya
+-                    </button>
+-                    <span className="text-xs font-bold">
+-                      Halaman {wargaProgressPage} dari {totalWargaProgressPages} ({sortedWargaProgress.length} Warga)
+-                    </span>
+-                    <button
+-                      onClick={() => setWargaProgressPage(p => Math.min(p + 1, totalWargaProgressPages))}
+-                      disabled={wargaProgressPage === totalWargaProgressPages}
+-                      className="px-3 py-1.5 border-2 border-black bg-white font-bold text-xs uppercase hover:bg-zinc-50 active-press disabled:opacity-50"
+-                    >
+-                      Selanjutnya
+-                    </button>
++                {!loading && sortedWargaProgress.length > 0 && (
++                  <div className="p-4 flex flex-col md:flex-row justify-between items-center gap-4 bg-white border-t-2 border-black">
++                    <p className="font-label-bold text-xs uppercase text-center md:text-left">Menampilkan {wargaProgressStartIndex}-{wargaProgressEndIndex} dari {sortedWargaProgress.length} warga</p>
++                    <div className="flex flex-wrap justify-center gap-1.5 md:gap-2">
++                      <button 
++                        onClick={() => setWargaProgressPage(prev => Math.max(prev - 1, 1))}
++                        disabled={wargaProgressPage === 1}
++                        className={`w-10 h-10 border-2 border-black flex items-center justify-center transition-all ${
++                          wargaProgressPage === 1 
++                            ? 'bg-surface-variant opacity-50 cursor-not-allowed' 
++                            : 'bg-white hover:bg-tertiary-fixed'
++                        }`}
++                      >
++                        <span className="material-symbols-outlined">chevron_left</span>
++                      </button>
++                      {getWargaProgressPageNumbers().map((page, idx) => (
++                        page === '...' ? (
++                          <span 
++                            key={`dots-${idx}`}
++                            className="w-10 h-10 border-2 border-black flex items-center justify-center font-label-bold bg-white text-zinc-400"
++                          >
++                            ...
++                          </span>
++                        ) : (
++                          <button
++                            key={page}
++                            onClick={() => setWargaProgressPage(page)}
++                            className={`w-10 h-10 border-2 border-black flex items-center justify-center transition-all font-label-bold ${
++                              wargaProgressPage === page
++                                ? 'bg-primary text-white neubrutal-shadow'
++                                : 'bg-white hover:bg-tertiary-fixed'
++                            }`}
++                          >
++                            {page}
++                          </button>
++                        )
++                      ))}
++                      <button 
++                        onClick={() => setWargaProgressPage(prev => Math.min(prev + 1, totalWargaProgressPages))}
++                        disabled={wargaProgressPage === totalWargaProgressPages}
++                        className={`w-10 h-10 border-2 border-black flex items-center justify-center transition-all ${
++                          wargaProgressPage === totalWargaProgressPages 
++                            ? 'bg-surface-variant opacity-50 cursor-not-allowed' 
++                            : 'bg-white hover:bg-tertiary-fixed'
++                        }`}
++                      >
++                        <span className="material-symbols-outlined">chevron_right</span>
++                      </button>
++                    </div>
+                   </div>
+                 )}
+               </div>
+-            </div>
+ 
+             {/* Right: History Iuran Warga */}
+             <div className="space-y-4">
+@@ -876,25 +943,55 @@ export default function AdminIuran() {
+                 </div>
+ 
+                 {/* Pagination */}
+-                {totalPages > 1 && (
+-                  <div className="p-3 flex justify-between items-center bg-zinc-50">
+-                    <button
+-                      onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+-                      disabled={currentPage === 1}
+-                      className="px-2 py-1 border border-black font-bold text-[10px] uppercase bg-white disabled:opacity-50"
+-                    >
+-                      Prev
+-                    </button>
+-                    <span className="text-[10px] font-bold">
+-                      Page {currentPage} of {totalPages}
+-                    </span>
+-                    <button
+-                      onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+-                      disabled={currentPage === totalPages}
+-                      className="px-2 py-1 border border-black font-bold text-[10px] uppercase bg-white disabled:opacity-50"
+-                    >
+-                      Next
+-                    </button>
++                {!loading && filteredHistory.length > 0 && (
++                  <div className="p-4 flex flex-col items-center gap-3 bg-white border-t-2 border-black">
++                    <p className="font-label-bold text-[10px] uppercase text-center">Menampilkan {historyStartIndex}-{historyEndIndex} dari {filteredHistory.length} riwayat</p>
++                    <div className="flex flex-wrap justify-center gap-1">
++                      <button 
++                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
++                        disabled={currentPage === 1}
++                        className={`w-8 h-8 border-2 border-black flex items-center justify-center transition-all ${
++                          currentPage === 1 
++                            ? 'bg-surface-variant opacity-50 cursor-not-allowed' 
++                            : 'bg-white hover:bg-tertiary-fixed'
++                        }`}
++                      >
++                        <span className="material-symbols-outlined text-sm">chevron_left</span>
++                      </button>
++                      {getHistoryPageNumbers().map((page, idx) => (
++                        page === '...' ? (
++                          <span 
++                            key={`dots-${idx}`}
++                            className="w-8 h-8 border-2 border-black flex items-center justify-center font-label-bold bg-white text-zinc-400 text-xs"
++                          >
++                            ...
++                          </span>
++                        ) : (
++                          <button
++                            key={page}
++                            onClick={() => setCurrentPage(page)}
++                            className={`w-8 h-8 border-2 border-black flex items-center justify-center transition-all font-label-bold text-xs ${
++                              currentPage === page
++                                ? 'bg-primary text-white neubrutal-shadow'
++                                : 'bg-white hover:bg-tertiary-fixed'
++                            }`}
++                          >
++                            {page}
++                          </button>
++                        )
++                      ))}
++                      <button 
++                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
++                        disabled={currentPage === totalPages}
++                        className={`w-8 h-8 border-2 border-black flex items-center justify-center transition-all ${
++                          currentPage === totalPages 
++                            ? 'bg-surface-variant opacity-50 cursor-not-allowed' 
++                            : 'bg-white hover:bg-tertiary-fixed'
++                        }`}
++                      >
++                        <span className="material-symbols-outlined text-sm">chevron_right</span>
++                      </button>
++                    </div>
+                   </div>
+                 )}
+               </div>
+@@ -963,25 +1060,55 @@ export default function AdminIuran() {
+                 </div>
+ 
+                 {/* Pagination for Warga List in Makam Tab */}
+-                {totalWargaProgressPages > 1 && (
+-                  <div className="p-4 flex justify-between items-center bg-zinc-50 border-t-2 border-black">
+-                    <button
+-                      onClick={() => setWargaProgressPage(p => Math.max(p - 1, 1))}
+-                      disabled={wargaProgressPage === 1}
+-                      className="px-3 py-1.5 border-2 border-black bg-white font-bold text-xs uppercase hover:bg-zinc-50 active-press disabled:opacity-50"
+-                    >
+-                      Sebelumnya
+-                    </button>
+-                    <span className="text-xs font-bold">
+-                      Halaman {wargaProgressPage} dari {totalWargaProgressPages} ({sortedWargaProgress.length} Warga)
+-                    </span>
+-                    <button
+-                      onClick={() => setWargaProgressPage(p => Math.min(p + 1, totalWargaProgressPages))}
+-                      disabled={wargaProgressPage === totalWargaProgressPages}
+-                      className="px-3 py-1.5 border-2 border-black bg-white font-bold text-xs uppercase hover:bg-zinc-50 active-press disabled:opacity-50"
+-                    >
+-                      Selanjutnya
+-                    </button>
++                {!loading && sortedWargaProgress.length > 0 && (
++                  <div className="p-4 flex flex-col md:flex-row justify-between items-center gap-4 bg-white border-t-2 border-black">
++                    <p className="font-label-bold text-xs uppercase text-center md:text-left">Menampilkan {wargaProgressStartIndex}-{wargaProgressEndIndex} dari {sortedWargaProgress.length} warga</p>
++                    <div className="flex flex-wrap justify-center gap-1.5 md:gap-2">
++                      <button 
++                        onClick={() => setWargaProgressPage(prev => Math.max(prev - 1, 1))}
++                        disabled={wargaProgressPage === 1}
++                        className={`w-10 h-10 border-2 border-black flex items-center justify-center transition-all ${
++                          wargaProgressPage === 1 
++                            ? 'bg-surface-variant opacity-50 cursor-not-allowed' 
++                            : 'bg-white hover:bg-tertiary-fixed'
++                        }`}
++                      >
++                        <span className="material-symbols-outlined">chevron_left</span>
++                      </button>
++                      {getWargaProgressPageNumbers().map((page, idx) => (
++                        page === '...' ? (
++                          <span 
++                            key={`dots-${idx}`}
++                            className="w-10 h-10 border-2 border-black flex items-center justify-center font-label-bold bg-white text-zinc-400"
++                          >
++                            ...
++                          </span>
++                        ) : (
++                          <button
++                            key={page}
++                            onClick={() => setWargaProgressPage(page)}
++                            className={`w-10 h-10 border-2 border-black flex items-center justify-center transition-all font-label-bold ${
++                              wargaProgressPage === page
++                                ? 'bg-primary text-white neubrutal-shadow'
++                                : 'bg-white hover:bg-tertiary-fixed'
++                            }`}
++                          >
++                            {page}
++                          </button>
++                        )
++                      ))}
++                      <button 
++                        onClick={() => setWargaProgressPage(prev => Math.min(prev + 1, totalWargaProgressPages))}
++                        disabled={wargaProgressPage === totalWargaProgressPages}
++                        className={`w-10 h-10 border-2 border-black flex items-center justify-center transition-all ${
++                          wargaProgressPage === totalWargaProgressPages 
++                            ? 'bg-surface-variant opacity-50 cursor-not-allowed' 
++                            : 'bg-white hover:bg-tertiary-fixed'
++                        }`}
++                      >
++                        <span className="material-symbols-outlined">chevron_right</span>
++                      </button>
++                    </div>
+                   </div>
+                 )}
+               </div>
+@@ -1012,25 +1139,55 @@ export default function AdminIuran() {
+                 </div>
+ 
+                 {/* Pagination */}
+-                {totalPages > 1 && (
+-                  <div className="p-3 flex justify-between items-center bg-zinc-50">
+-                    <button
+-                      onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+-                      disabled={currentPage === 1}
+-                      className="px-2 py-1 border border-black font-bold text-[10px] uppercase bg-white disabled:opacity-50"
+-                    >
+-                      Prev
+-                    </button>
+-                    <span className="text-[10px] font-bold">
+-                      Page {currentPage} of {totalPages}
+-                    </span>
+-                    <button
+-                      onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+-                      disabled={currentPage === totalPages}
+-                      className="px-2 py-1 border border-black font-bold text-[10px] uppercase bg-white disabled:opacity-50"
+-                    >
+-                      Next
+-                    </button>
++                {!loading && filteredHistory.length > 0 && (
++                  <div className="p-4 flex flex-col items-center gap-3 bg-white border-t-2 border-black">
++                    <p className="font-label-bold text-[10px] uppercase text-center">Menampilkan {historyStartIndex}-{historyEndIndex} dari {filteredHistory.length} riwayat</p>
++                    <div className="flex flex-wrap justify-center gap-1">
++                      <button 
++                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
++                        disabled={currentPage === 1}
++                        className={`w-8 h-8 border-2 border-black flex items-center justify-center transition-all ${
++                          currentPage === 1 
++                            ? 'bg-surface-variant opacity-50 cursor-not-allowed' 
++                            : 'bg-white hover:bg-tertiary-fixed'
++                        }`}
++                      >
++                        <span className="material-symbols-outlined text-sm">chevron_left</span>
++                      </button>
++                      {getHistoryPageNumbers().map((page, idx) => (
++                        page === '...' ? (
++                          <span 
++                            key={`dots-${idx}`}
++                            className="w-8 h-8 border-2 border-black flex items-center justify-center font-label-bold bg-white text-zinc-400 text-xs"
++                          >
++                            ...
++                          </span>
++                        ) : (
++                          <button
++                            key={page}
++                            onClick={() => setCurrentPage(page)}
++                            className={`w-8 h-8 border-2 border-black flex items-center justify-center transition-all font-label-bold text-xs ${
++                              currentPage === page
++                                ? 'bg-primary text-white neubrutal-shadow'
++                                : 'bg-white hover:bg-tertiary-fixed'
++                            }`}
++                          >
++                            {page}
++                          </button>
++                        )
++                      ))}
++                      <button 
++                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
++                        disabled={currentPage === totalPages}
++                        className={`w-8 h-8 border-2 border-black flex items-center justify-center transition-all ${
++                          currentPage === totalPages 
++                            ? 'bg-surface-variant opacity-50 cursor-not-allowed' 
++                            : 'bg-white hover:bg-tertiary-fixed'
++                        }`}
++                      >
++                        <span className="material-symbols-outlined text-sm">chevron_right</span>
++                      </button>
++                    </div>
+                   </div>
+                 )}
+               </div>

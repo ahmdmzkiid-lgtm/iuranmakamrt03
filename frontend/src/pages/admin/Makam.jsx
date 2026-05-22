@@ -55,6 +55,25 @@ export default function AdminMakam() {
   // Paginated Warga List
   const paginatedWarga = filteredWarga.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
   const totalPages = Math.ceil(filteredWarga.length / PAGE_SIZE) || 1
+  const startIndex = filteredWarga.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
+  const endIndex = Math.min(currentPage * PAGE_SIZE, filteredWarga.length)
+
+  const getPageNumbers = () => {
+    const pages = []
+    const range = 1
+    for (let i = 1; i <= totalPages; i++) {
+      if (
+        i === 1 ||
+        i === totalPages ||
+        (i >= currentPage - range && i <= currentPage + range)
+      ) {
+        pages.push(i)
+      } else if (pages[pages.length - 1] !== '...') {
+        pages.push('...')
+      }
+    }
+    return pages
+  }
 
   // Export to Excel logic
   const handleExportExcel = async () => {
@@ -249,26 +268,56 @@ export default function AdminMakam() {
             </table>
           </div>
 
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="p-4 flex justify-between items-center bg-zinc-50 border-t-4 border-black">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
-                disabled={currentPage === 1}
-                className="px-4 py-2 border-2 border-black font-headline-md text-xs uppercase bg-white hover:bg-zinc-50 disabled:opacity-50 cursor-pointer"
-              >
-                Sebelumnya
-              </button>
-              <span className="font-display-bold text-xs uppercase">
-                Halaman {currentPage} dari {totalPages}
-              </span>
-              <button
-                onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="px-4 py-2 border-2 border-black font-headline-md text-xs uppercase bg-white hover:bg-zinc-50 disabled:opacity-50 cursor-pointer"
-              >
-                Selanjutnya
-              </button>
+          {/* Pagination */}
+          {!loading && filteredWarga.length > 0 && (
+            <div className="p-4 md:p-gutter flex flex-col md:flex-row justify-between items-center gap-4 bg-white border-t-4 border-black">
+              <p className="font-label-bold text-xs uppercase text-center md:text-left">Menampilkan {startIndex}-{endIndex} dari {filteredWarga.length} warga</p>
+              <div className="flex flex-wrap justify-center gap-1.5 md:gap-2">
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className={`w-10 h-10 border-2 border-black flex items-center justify-center transition-all ${
+                    currentPage === 1 
+                      ? 'bg-surface-variant opacity-50 cursor-not-allowed' 
+                      : 'bg-white hover:bg-tertiary-fixed'
+                  }`}
+                >
+                  <span className="material-symbols-outlined">chevron_left</span>
+                </button>
+                {getPageNumbers().map((page, idx) => (
+                  page === '...' ? (
+                    <span 
+                      key={`dots-${idx}`}
+                      className="w-10 h-10 border-2 border-black flex items-center justify-center font-label-bold bg-white text-zinc-400"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`w-10 h-10 border-2 border-black flex items-center justify-center transition-all font-label-bold ${
+                        currentPage === page
+                          ? 'bg-primary text-white neubrutal-shadow'
+                          : 'bg-white hover:bg-tertiary-fixed'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  )
+                ))}
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className={`w-10 h-10 border-2 border-black flex items-center justify-center transition-all ${
+                    currentPage === totalPages 
+                      ? 'bg-surface-variant opacity-50 cursor-not-allowed' 
+                      : 'bg-white hover:bg-tertiary-fixed'
+                  }`}
+                >
+                  <span className="material-symbols-outlined">chevron_right</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
