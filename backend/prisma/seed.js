@@ -4,17 +4,14 @@ import bcrypt from 'bcryptjs'
 const prisma = new PrismaClient()
 
 async function main() {
-    const adminUsername = process.env.ADMIN_USERNAME || 'AdminRT03'
-    const adminPassword = process.env.ADMIN_PASSWORD || 'AdminRT03@!'
-    
-    const hashedPassword = await bcrypt.hash(adminPassword, 10)
+    const hashedPassword = await bcrypt.hash('AdminRT03@!', 10)
     
     const admin = await prisma.user.upsert({
-      where: { nomorKK: adminUsername },
+      where: { nomorKK: 'AdminRT03' },
       update: {},
       create: {
-        nama: adminUsername,
-        nomorKK: adminUsername,
+        nama: 'AdminRT03',
+        nomorKK: 'AdminRT03',
         password: hashedPassword,
         role: 'admin'
       }
