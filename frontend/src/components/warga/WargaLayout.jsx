@@ -6,7 +6,7 @@ const navItems = [
   { label: 'Dashboard', path: '/warga', icon: 'dashboard' },
   { label: 'Tagihan', path: '/warga/tagihan', icon: 'payments' },
   { label: 'Riwayat', path: '/warga/riwayat', icon: 'history' },
-  { label: 'Makam', path: '/warga/makam', icon: 'church' },
+  { label: 'Makam', path: '/warga/makam', icon: 'monument' },
   { label: 'Kuitansi', path: '/warga/kuitansi', icon: 'receipt_long' },
   { label: 'Setelan', path: '/warga/setelan', icon: 'settings' },
 ]
@@ -15,7 +15,7 @@ const navItems = [
 const mobileNavItems = [
   { label: 'Dash', path: '/warga', icon: 'dashboard' },
   { label: 'Tagihan', path: '/warga/tagihan', icon: 'payments' },
-  { label: 'Makam', path: '/warga/makam', icon: 'church' },
+  { label: 'Makam', path: '/warga/makam', icon: 'monument' },
   { label: 'Menu', path: '/warga/setelan', icon: 'menu' },
 ]
 
@@ -186,7 +186,11 @@ export default function WargaLayout({ children }) {
                   : 'bg-white hover:bg-emerald-400 hover:text-black active:translate-x-1 active:translate-y-1 active:shadow-none'
               }`}
             >
-              <span className="material-symbols-outlined">{item.icon}</span>
+              {item.icon === 'monument' ? (
+                <img src="/tombstone.webp" alt="Makam" className="w-6 h-6" />
+              ) : (
+                <span className="material-symbols-outlined">{item.icon}</span>
+              )}
               {item.label}
             </Link>
           ))}
@@ -226,12 +230,16 @@ export default function WargaLayout({ children }) {
               isMobileActive(item.path) ? 'text-primary' : 'text-black'
             }`}
           >
-            <span
-              className="material-symbols-outlined"
-              style={isMobileActive(item.path) ? { fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24" } : {}}
-            >
-              {item.icon}
-            </span>
+            {item.icon === 'monument' ? (
+              <img src="/tombstone.webp" alt="Makam" className="w-6 h-6" />
+            ) : (
+              <span
+                className="material-symbols-outlined"
+                style={isMobileActive(item.path) ? { fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24" } : {}}
+              >
+                {item.icon}
+              </span>
+            )}
             <span className="text-[10px] font-black uppercase">{item.label}</span>
           </Link>
         ))}

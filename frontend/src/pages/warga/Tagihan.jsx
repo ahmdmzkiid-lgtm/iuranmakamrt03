@@ -20,8 +20,9 @@ export default function WargaTagihan() {
   // Form states
   const [payType, setPayType] = useState('semua') // 'warga' | 'makam' | 'semua'
   const [jumlahBulanMakam, setJumlahBulanMakam] = useState(1)
-  const [bulanWarga, setBulanWarga] = useState(new Date().getMonth() + 1)
-  const [tahunWarga, setTahunWarga] = useState(new Date().getFullYear())
+  const [jumlahBulanWarga, setJumlahBulanWarga] = useState(1) // NEW: untuk multi-bulan warga
+  const [startBulanWarga, setStartBulanWarga] = useState(new Date().getMonth() + 1) // NEW
+  const [startTahunWarga, setStartTahunWarga] = useState(new Date().getFullYear()) // NEW
   const [metode, setMetode] = useState('transfer') // 'transfer' | 'qris' | 'tunai'
   const [buktiFile, setBuktiFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
@@ -68,7 +69,8 @@ export default function WargaTagihan() {
     const isWarga = payType === 'warga' || payType === 'semua'
     const isMakam = payType === 'makam' || payType === 'semua'
 
-    const totalWarga = isWarga && !summary.iuranWarga.sudahBayar ? Number(summary.iuranWarga.tarif) : 0
+    // Calculate total warga: multiply by jumlahBulanWarga
+    const totalWarga = isWarga && !summary.iuranWarga.sudahBayar ? jumlahBulanWarga * Number(summary.iuranWarga.tarif) : 0
     const totalMakam = isMakam && !summary.warga.makamLunas 
       ? jumlahBulanMakam * summary.warga.jumlahOrang * Number(summary.iuranMakam.tarifPerOrang) 
       : 0
@@ -78,7 +80,7 @@ export default function WargaTagihan() {
       totalMakam,
       total: totalWarga + totalMakam
     }
-  }, [summary, payType, jumlahBulanMakam])
+  }, [summary, payType, jumlahBulanWarga, jumlahBulanMakam])
 
   const handleBayar = async () => {
     if (billSummary.total === 0) {
@@ -109,15 +111,17 @@ export default function WargaTagihan() {
       let endpoint = '/iuran/bayar-semua'
       if (payType === 'warga') {
         endpoint = '/iuran/bayar-warga'
-        formData.append('bulan', bulanWarga)
-        formData.append('tahun', tahunWarga)
+        formData.append('startBulan', startBulanWarga)
+        formData.append('startTahun', startTahunWarga)
+        formData.append('jumlahBulanWarga', jumlahBulanWarga)
       } else if (payType === 'makam') {
         endpoint = '/iuran/bayar-makam'
         formData.append('jumlahBulan', jumlahBulanMakam)
       } else {
         formData.append('jumlahBulanMakam', jumlahBulanMakam)
-        formData.append('bulanWarga', bulanWarga)
-        formData.append('tahunWarga', tahunWarga)
+        formData.append('startBulanWarga', startBulanWarga)
+        formData.append('startTahunWarga', startTahunWarga)
+        formData.append('jumlahBulanWarga', jumlahBulanWarga)
       }
 
       await api.post(endpoint, formData, {
@@ -176,7 +180,7 @@ export default function WargaTagihan() {
                 {/* Iuran Makam Progress */}
                 <div className="border-4 border-black p-4 bg-zinc-50 flex items-start gap-4">
                   <div className="w-10 h-10 bg-tertiary-fixed border-2 border-black flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-xl">deceased</span>
+                    <img src="/tombstone.webp" alt="Makam" className="w-6 h-6" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-headline-md uppercase text-xs">Iuran Makam (36 Bln)</h3>
@@ -217,7 +221,7 @@ export default function WargaTagihan() {
                         payType === 'makam' ? 'bg-tertiary-fixed text-black' : 'bg-white hover:bg-zinc-50'
                       } ${summary?.warga?.makamLunas ? 'opacity-40 cursor-not-allowed' : ''}`}
                     >
-                      <span className="material-symbols-outlined text-lg">deceased</span>
+                      <img src="/tombstone.webp" alt="Makam" className="w-5 h-5" />
                       Iuran Makam
                     </button>
                     <button
@@ -237,14 +241,16 @@ export default function WargaTagihan() {
                 {/* 2. Detail Pembayaran Iuran Warga */}
                 {(payType === 'warga' || payType === 'semua') && !summary?.iuranWarga?.sudahBayar && (
                   <div className="border-4 border-black p-4 bg-secondary-container/20 space-y-4">
-                    <p className="font-display-bold text-xs uppercase text-zinc-500">Form Iuran Bulanan Warga (Rp 10.000 / KK)</p>
+                    <p className="font-display-bold text-xs uppercase text-zinc-500">Form Iuran Bulanan Warga (Rp 10.000 / KK / Bulan)</p>
+                    
+                    {/* Start month & year selection */}
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block font-label-bold uppercase text-[10px] mb-1 text-zinc-500">Bulan</label>
+                        <label className="block font-label-bold uppercase text-[10px] mb-1 text-zinc-500">Mulai dari Bulan</label>
                         <select
                           className="w-full border-2 border-black p-2 text-xs font-bold bg-white"
-                          value={bulanWarga}
-                          onChange={(e) => setBulanWarga(parseInt(e.target.value))}
+                          value={startBulanWarga}
+                          onChange={(e) => setStartBulanWarga(parseInt(e.target.value))}
                         >
                           {[...Array(12)].map((_, i) => (
                             <option key={i+1} value={i+1}>{getBulanName(i+1)}</option>
@@ -255,14 +261,79 @@ export default function WargaTagihan() {
                         <label className="block font-label-bold uppercase text-[10px] mb-1 text-zinc-500">Tahun</label>
                         <select
                           className="w-full border-2 border-black p-2 text-xs font-bold bg-white"
-                          value={tahunWarga}
-                          onChange={(e) => setTahunWarga(parseInt(e.target.value))}
+                          value={startTahunWarga}
+                          onChange={(e) => setStartTahunWarga(parseInt(e.target.value))}
                         >
                           {[2024, 2025, 2026, 2027].map(y => (
                             <option key={y} value={y}>{y}</option>
                           ))}
                         </select>
                       </div>
+                    </div>
+
+                    {/* Jumlah bulan selection */}
+                    <div>
+                      <div className="flex justify-between items-baseline mb-2">
+                        <label className="block font-label-bold uppercase text-[10px] text-zinc-500">Jumlah Bulan yang Ingin Dibayar</label>
+                        <span className="text-[10px] font-mono font-bold text-zinc-500">Max: 12 Bulan</span>
+                      </div>
+                      <input
+                        type="number"
+                        min="1"
+                        max="12"
+                        className="w-full border-4 border-black p-3 font-bold bg-white text-sm"
+                        value={jumlahBulanWarga}
+                        onChange={(e) => setJumlahBulanWarga(Math.min(12, Math.max(1, parseInt(e.target.value) || 1)))}
+                      />
+                    </div>
+
+                    {/* Quick buttons */}
+                    <div>
+                      <p className="text-[10px] font-label-bold uppercase text-zinc-500 mb-2">Atau pilih jumlah bulan</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[1, 2, 3, 4, 6, 12].map(bulan => (
+                          <button
+                            key={bulan}
+                            type="button"
+                            onClick={() => setJumlahBulanWarga(bulan)}
+                            className={`p-2 border-2 border-black font-bold uppercase text-xs transition-all ${
+                              jumlahBulanWarga === bulan 
+                                ? 'bg-secondary-container text-white' 
+                                : 'bg-white hover:bg-zinc-100'
+                            }`}
+                          >
+                            {bulan} Bln
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Preview bulan-bulan yang akan dibayar */}
+                    <div className="bg-white border-2 border-zinc-300 p-3 rounded text-xs">
+                      <p className="font-bold text-zinc-500 mb-2 uppercase">Rincian Bulan yang Akan Dibayarkan:</p>
+                      <div className="space-y-1">
+                        {(() => {
+                          const months = []
+                          let currentBln = startBulanWarga
+                          let currentThn = startTahunWarga
+                          for (let i = 0; i < jumlahBulanWarga; i++) {
+                            months.push(`${getBulanName(currentBln)} ${currentThn}`)
+                            currentBln++
+                            if (currentBln > 12) {
+                              currentBln = 1
+                              currentThn++
+                            }
+                          }
+                          return months.map((m, i) => (
+                            <p key={i} className="text-[9px] text-zinc-600">
+                              ✓ {m} - {formatRp(summary?.iuranWarga?.tarif)}
+                            </p>
+                          ))
+                        })()}
+                      </div>
+                      <p className="font-bold text-secondary-container mt-2 border-t border-zinc-200 pt-2">
+                        Total: {formatRp(jumlahBulanWarga * summary?.iuranWarga?.tarif)}
+                      </p>
                     </div>
                   </div>
                 )}

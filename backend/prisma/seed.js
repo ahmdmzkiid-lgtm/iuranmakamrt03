@@ -19,7 +19,6 @@ async function main() {
 
   console.log('Seed success: Admin account created')
   console.log('Username:', admin.nomorKK)
-  console.log('Password: AdminRT03@!')
 }
 
 main()

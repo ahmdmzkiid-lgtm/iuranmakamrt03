@@ -47,7 +47,7 @@ export default function AdminDashboard() {
   const pendingItems = dataIuran.filter(i => i.status === 'pending')
 
   const quickStats = [
-    { label: 'KK Aktif', value: loading ? '...' : (statistik?.totalWarga?.toString() || '0'), icon: 'groups', bg: 'bg-primary-container', text: 'text-white' },
+    { label: 'Warga Aktif', value: loading ? '...' : (statistik?.totalWarga?.toString() || '0'), icon: 'groups', bg: 'bg-primary-container', text: 'text-white' },
     { label: `Iuran Warga ${getBulanName(currentMonth)}`, value: loading ? '...' : `${statistik?.iuranWarga?.sudahBayar || 0} / ${statistik?.totalWarga || 0} KK`, icon: 'payments', bg: 'bg-secondary-container', text: 'text-black' },
     { label: 'Pending Verifikasi', value: loading ? '...' : (statistik?.pendingVerifikasi?.toString() || '0'), icon: 'pending_actions', bg: 'bg-tertiary-fixed', text: 'text-black' },
     { label: 'Total Dana Makam', value: loading ? '...' : formatRp(statistik?.iuranMakam?.totalPendapatan || 0), icon: 'receipt_long', bg: 'bg-white', text: 'text-black' },

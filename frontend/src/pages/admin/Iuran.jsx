@@ -25,8 +25,9 @@ export default function AdminIuran() {
     wargaId: '', 
     tipe: 'semua', // 'warga' | 'makam' | 'semua'
     jumlahBulanMakam: 1,
-    bulanWarga: new Date().getMonth() + 1,
-    tahunWarga: new Date().getFullYear()
+    startBulanWarga: new Date().getMonth() + 1,
+    startTahunWarga: new Date().getFullYear(),
+    jumlahBulanWarga: 1
   })
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [rejectId, setRejectId] = useState(null)
@@ -178,16 +179,18 @@ export default function AdminIuran() {
       let payload = {
         wargaId: rekamData.wargaId,
         jumlahBulanMakam: rekamData.jumlahBulanMakam,
-        bulanWarga: rekamData.bulanWarga,
-        tahunWarga: rekamData.tahunWarga
+        startBulanWarga: rekamData.startBulanWarga,
+        startTahunWarga: rekamData.startTahunWarga,
+        jumlahBulanWarga: rekamData.jumlahBulanWarga
       }
 
       if (rekamData.tipe === 'warga') {
         endpoint = '/iuran/admin/bayar-warga'
         payload = {
           wargaId: rekamData.wargaId,
-          bulan: rekamData.bulanWarga,
-          tahun: rekamData.tahunWarga
+          startBulan: rekamData.startBulanWarga,
+          startTahun: rekamData.startTahunWarga,
+          jumlahBulanWarga: rekamData.jumlahBulanWarga
         }
       } else if (rekamData.tipe === 'makam') {
         endpoint = '/iuran/admin/bayar-makam'
@@ -204,8 +207,9 @@ export default function AdminIuran() {
         wargaId: '',
         tipe: 'semua',
         jumlahBulanMakam: 1,
-        bulanWarga: new Date().getMonth() + 1,
-        tahunWarga: new Date().getFullYear()
+        startBulanWarga: new Date().getMonth() + 1,
+        startTahunWarga: new Date().getFullYear(),
+        jumlahBulanWarga: 1
       })
       setWargaSearch('')
       fetchData()
@@ -1388,14 +1392,14 @@ export default function AdminIuran() {
         {/* Modal Rekam Bayar Offline */}
         {showRekamModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white border-4 border-black w-full max-w-lg neubrutal-shadow">
-              <div className="p-4 border-b-4 border-black bg-primary text-white flex justify-between items-center">
+            <form onSubmit={handleRekamBayar} className="bg-white border-4 border-black w-full max-w-lg neubrutal-shadow flex flex-col max-h-[90vh]">
+              <div className="p-4 border-b-4 border-black bg-primary text-white flex justify-between items-center flex-shrink-0">
                 <h2 className="font-display-bold text-lg uppercase">Rekam Bayar Offline (Tunai)</h2>
-                <button onClick={() => setShowRekamModal(false)} className="hover:text-black transition-colors">
+                <button type="button" onClick={() => setShowRekamModal(false)} className="hover:text-black transition-colors">
                   <span className="material-symbols-outlined text-2xl">close</span>
                 </button>
               </div>
-              <form onSubmit={handleRekamBayar} className="p-6 space-y-4">
+              <div className="p-6 space-y-4 overflow-y-auto flex-1">
                 {/* Cari Warga */}
                 <div className="relative" ref={wargaDropdownRef}>
                   <label className="block font-label-bold uppercase text-xs mb-2">Cari & Pilih Warga (KK)</label>
@@ -1454,14 +1458,14 @@ export default function AdminIuran() {
                 {/* Detail Iuran Warga */}
                 {(rekamData.tipe === 'warga' || rekamData.tipe === 'semua') && (
                   <div className="p-4 border-2 border-black bg-secondary-container/20 space-y-3">
-                    <p className="font-display-bold text-xs uppercase text-zinc-500">Iuran Warga Bulanan (Rp 10.000 / KK)</p>
+                    <p className="font-display-bold text-xs uppercase text-zinc-500">Iuran Warga Bulanan (Rp 10.000 / KK / Bulan)</p>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block font-label-bold uppercase text-[9px] mb-1">Bulan</label>
+                        <label className="block font-label-bold uppercase text-[9px] mb-1">Mulai Bulan</label>
                         <select
                           className="w-full border-2 border-black p-2 font-bold text-xs bg-white"
-                          value={rekamData.bulanWarga}
-                          onChange={(e) => setRekamData(prev => ({ ...prev, bulanWarga: parseInt(e.target.value) }))}
+                          value={rekamData.startBulanWarga}
+                          onChange={(e) => setRekamData(prev => ({ ...prev, startBulanWarga: parseInt(e.target.value) }))}
                         >
                           {[...Array(12)].map((_, i) => (
                             <option key={i+1} value={i+1}>{getBulanName(i+1)}</option>
@@ -1472,14 +1476,25 @@ export default function AdminIuran() {
                         <label className="block font-label-bold uppercase text-[9px] mb-1">Tahun</label>
                         <select
                           className="w-full border-2 border-black p-2 font-bold text-xs bg-white"
-                          value={rekamData.tahunWarga}
-                          onChange={(e) => setRekamData(prev => ({ ...prev, tahunWarga: parseInt(e.target.value) }))}
+                          value={rekamData.startTahunWarga}
+                          onChange={(e) => setRekamData(prev => ({ ...prev, startTahunWarga: parseInt(e.target.value) }))}
                         >
                           {[2024, 2025, 2026, 2027].map(y => (
                             <option key={y} value={y}>{y}</option>
                           ))}
                         </select>
                       </div>
+                    </div>
+                    <div>
+                      <label className="block font-label-bold uppercase text-[9px] mb-1">Jumlah Bulan</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="12"
+                        className="w-full border-2 border-black p-2 font-bold text-xs bg-white"
+                        value={rekamData.jumlahBulanWarga}
+                        onChange={(e) => setRekamData(prev => ({ ...prev, jumlahBulanWarga: Math.min(12, Math.max(1, parseInt(e.target.value) || 1)) }))}
+                      />
                     </div>
                   </div>
                 )}
@@ -1501,26 +1516,26 @@ export default function AdminIuran() {
                     </div>
                   </div>
                 )}
+              </div>
 
-                {/* Action Buttons */}
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowRekamModal(false)}
-                    className="flex-1 py-3 border-4 border-black font-headline-md uppercase text-sm hover:bg-zinc-100"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isProcessing}
-                    className="flex-1 py-3 bg-primary text-white border-4 border-black font-headline-md uppercase text-sm neubrutal-shadow active-press disabled:opacity-50"
-                  >
-                    {isProcessing ? 'Menyimpan...' : 'Simpan Pembayaran'}
-                  </button>
-                </div>
-              </form>
-            </div>
+              {/* Action Buttons - Inside Form */}
+              <div className="flex gap-3 p-4 border-t-4 border-black bg-white flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowRekamModal(false)}
+                  className="flex-1 py-3 border-4 border-black font-headline-md uppercase text-sm hover:bg-zinc-100"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isProcessing}
+                  className="flex-1 py-3 bg-primary text-white border-4 border-black font-headline-md uppercase text-sm neubrutal-shadow active-press disabled:opacity-50"
+                >
+                  {isProcessing ? 'Menyimpan...' : 'Simpan Pembayaran'}
+                </button>
+              </div>
+            </form>
           </div>
         )}
 
