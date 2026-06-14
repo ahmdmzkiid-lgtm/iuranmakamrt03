@@ -233,7 +233,7 @@ export default function AdminIuran() {
       worksheet.getColumn(3).width = 35;  // NAMA
       worksheet.getColumn(4).width = 25;  // NIK
       worksheet.getColumn(5).width = 18;  // IURAN MAKAM
-      worksheet.getColumn(6).width = 18;  // IURAN WARGA
+      worksheet.getColumn(6).width = 18;  // IURAN BULANAN
       worksheet.getColumn(7).width = 28;  // PERIODE
       worksheet.getColumn(8).width = 16;  // JUMLAH
       worksheet.getColumn(9).width = 20;  // METODE
@@ -260,7 +260,7 @@ export default function AdminIuran() {
 
       // 3. Setup Table Headers in Row 4
       const headerRow = worksheet.getRow(4)
-      const headers = ['NO', 'NO KK', 'NAMA', 'NIK', 'IURAN MAKAM', 'IURAN WARGA', 'PERIODE', 'JUMLAH', 'METODE', 'TANGGAL BAYAR']
+      const headers = ['NO', 'NO KK', 'NAMA', 'NIK', 'IURAN MAKAM', 'IURAN BULANAN', 'PERIODE', 'JUMLAH', 'METODE', 'TANGGAL BAYAR']
       headers.forEach((h, i) => {
         const cell = headerRow.getCell(i + 1)
         cell.value = h
@@ -378,7 +378,7 @@ export default function AdminIuran() {
         dataRow.getCell(3).value = namesString // NAMA
         dataRow.getCell(4).value = niksString // NIK
         dataRow.getCell(5).value = nominalMakam > 0 ? nominalMakam : 0 // IURAN MAKAM
-        dataRow.getCell(6).value = nominalWarga > 0 ? nominalWarga : 0 // IURAN WARGA
+        dataRow.getCell(6).value = nominalWarga > 0 ? nominalWarga : 0 // IURAN BULANAN
         
         // Consistent format: Makam first, then Warga, separated by ' / '
         const periodParts = []
@@ -450,7 +450,7 @@ export default function AdminIuran() {
         dataRow.getCell(3).value = namesString // NAMA
         dataRow.getCell(4).value = niksString // NIK
         dataRow.getCell(5).value = '-' // IURAN MAKAM
-        dataRow.getCell(6).value = '-' // IURAN WARGA
+        dataRow.getCell(6).value = '-' // IURAN BULANAN
         dataRow.getCell(7).value = `${getBulanName(selectedMonth)} ${selectedYear} (BELUM BAYAR)` // PERIODE
         dataRow.getCell(8).value = '-' // JUMLAH
         dataRow.getCell(9).value = '-' // METODE
@@ -558,7 +558,7 @@ export default function AdminIuran() {
 
       // Rows
       const r1 = summarySheet.getRow(5)
-      r1.getCell(1).value = "Total Penerimaan Iuran Warga"
+      r1.getCell(1).value = "Total Penerimaan Iuran Bulanan"
       r1.getCell(2).value = totalSumWarga
 
       const r2 = summarySheet.getRow(6)
@@ -730,7 +730,7 @@ export default function AdminIuran() {
           <div>
             <h1 className="font-display-bold text-3xl md:text-4xl uppercase leading-none">Kelola Pembayaran</h1>
             <p className="font-body-md text-zinc-600 mt-2">
-              Sistem iuran bulanan warga dan pembayaran makam (36 bulan wajib bayar).
+              Sistem iuran makam bulanan dan iuran perluasan makam (35 bulan wajib bayar).
             </p>
           </div>
           <div className="flex flex-row items-center gap-3 w-full md:w-auto overflow-x-auto pb-1">
@@ -770,13 +770,13 @@ export default function AdminIuran() {
               <p className="text-xs font-bold mt-2 text-white/70">Terdaftar di {statistik.totalKK} KK</p>
             </div>
             <div className="bg-secondary-container text-black border-4 border-black p-4 neubrutal-shadow">
-              <p className="text-xs uppercase font-bold opacity-70">Iuran Warga Bulan Ini</p>
+              <p className="text-xs uppercase font-bold opacity-70">Iuran Makam Bulan Ini</p>
               <p className="text-3xl font-display-bold mt-1">{statistik.iuranWarga?.sudahBayar} / {statistik.totalKK} KK</p>
               <p className="text-xs font-bold mt-2 text-zinc-600">Pendapatan: {formatRp(statistik.iuranWarga?.pendapatan)}</p>
             </div>
             <div className="bg-tertiary-fixed text-black border-4 border-black p-4 neubrutal-shadow">
-              <p className="text-xs uppercase font-bold opacity-70">Makam Lunas (36 Bln)</p>
-              <p className="text-3xl font-display-bold mt-1">{statistik.iuranMakam?.wargaLunas36Bulan} KK</p>
+              <p className="text-xs uppercase font-bold opacity-70">Perluasan Makam Lunas (35 Bln)</p>
+              <p className="text-3xl font-display-bold mt-1">{statistik.iuranMakam?.wargaLunas35Bulan} KK</p>
               <p className="text-xs font-bold mt-2 text-zinc-600">Total Masuk: {formatRp(statistik.iuranMakam?.totalPendapatan)}</p>
             </div>
             <div className="bg-white text-black border-4 border-black p-4 neubrutal-shadow">
@@ -792,12 +792,12 @@ export default function AdminIuran() {
           <button
             onClick={() => setActiveTab('warga')}
             className={`px-6 py-3 font-headline-md uppercase text-sm md:text-base border-4 border-b-0 border-black transition-all ${
-              activeTab === 'warga' 
-                ? 'bg-primary-container text-white translate-y-1' 
+              activeTab === 'warga'
+                ? 'bg-primary-container text-white translate-y-1'
                 : 'bg-white hover:bg-zinc-100'
             }`}
           >
-            Iuran Warga (Bulanan)
+            Iuran Makam
           </button>
           <button
             onClick={() => setActiveTab('makam')}
@@ -807,7 +807,7 @@ export default function AdminIuran() {
                 : 'bg-white hover:bg-zinc-100'
             }`}
           >
-            Iuran Makam (36 Bulan)
+            Iuran Perluasan Makam (35 Bulan)
           </button>
           <button
             onClick={() => setActiveTab('pending')}
@@ -848,7 +848,7 @@ export default function AdminIuran() {
                         {tx.items.map((item, idx) => (
                           <div key={idx} className="flex items-center gap-2 text-xs">
                             <span className={`inline-block px-1.5 py-0.5 border border-black font-bold text-[9px] uppercase ${item.tipe === 'warga' ? 'bg-primary-container text-white' : 'bg-tertiary-fixed'}`}>
-                              {item.tipe === 'warga' ? 'Warga' : 'Makam'}
+                              {item.tipe === 'warga' ? 'Makam' : 'Perluasan Makam'}
                             </span>
                             <span className="font-medium text-zinc-700">
                               {item.tipe === 'warga' 
@@ -898,7 +898,7 @@ export default function AdminIuran() {
             )}
           </div>
         ) : activeTab === 'warga' ? (
-          /* WARGA TAB (Bulanan) */
+          /* IURAN MAKAM TAB (Bulanan) */
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Left: Progress per KK (PAGINATED & ALPHABETICAL) */}
             <div className="lg:col-span-2 space-y-4">
@@ -918,7 +918,7 @@ export default function AdminIuran() {
                     <thead className="bg-zinc-50 border-b-2 border-black">
                       <tr>
                         <th className="p-3 font-label-bold uppercase text-xs">Warga / KK (A-Z)</th>
-                        <th className="p-3 font-label-bold uppercase text-xs text-center">Iuran Warga</th>
+                        <th className="p-3 font-label-bold uppercase text-xs text-center">Iuran Makam</th>
                         <th className="p-3 font-label-bold uppercase text-xs text-center">Sisa Makam</th>
                         <th className="p-3 font-label-bold uppercase text-xs text-right">Status</th>
                       </tr>
@@ -1022,7 +1022,7 @@ export default function AdminIuran() {
               </div>
             </div>
 
-            {/* Right: History Iuran Warga */}
+            {/* Right: History Iuran Makam */}
             <div className="space-y-4">
               <div className="bg-white border-4 border-black neubrutal-shadow">
                 <div className="p-4 border-b-4 border-black bg-zinc-100">
@@ -1116,13 +1116,13 @@ export default function AdminIuran() {
             </div>
           </div>
         ) : (
-          /* MAKAM TAB (36 Bulan) */
+          /* PERLUASAN MAKAM TAB (35 Bulan) */
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Left: Progress makam per KK (PAGINATED & ALPHABETICAL) */}
             <div className="lg:col-span-2 space-y-4">
               <div className="bg-white border-4 border-black neubrutal-shadow">
                 <div className="p-4 border-b-4 border-black bg-zinc-100 flex items-center justify-between">
-                  <h3 className="font-headline-md uppercase text-sm">Progress Iuran Makam Warga</h3>
+                  <h3 className="font-headline-md uppercase text-sm">Progress Iuran Perluasan Makam Warga</h3>
                   <input
                     type="text"
                     placeholder="Cari warga..."
@@ -1136,18 +1136,18 @@ export default function AdminIuran() {
                     <div className="p-8 text-center text-xs font-bold uppercase text-zinc-500">Tidak ada data warga</div>
                   ) : (
                     paginatedWargaProgress.map(w => {
-                      const percentage = Math.min(100, Math.round((w.bulanMakamTerbayar / 36) * 100))
+                      const percentage = Math.min(100, Math.round((w.bulanMakamTerbayar / 35) * 100))
                       return (
                         <div key={w.id} className="p-4 hover:bg-zinc-50 flex flex-col md:flex-row justify-between md:items-center gap-4">
                           <div className="flex-1">
                             <div className="flex items-baseline justify-between">
                               <p className="font-bold text-sm">{w.nama}</p>
                               <span className="text-xs font-mono font-bold text-zinc-600">
-                                {w.bulanMakamTerbayar} / 36 bulan
+                                {w.bulanMakamTerbayar} / 35 bulan
                               </span>
                             </div>
                             <p className="text-[10px] font-medium text-zinc-500 mt-0.5">
-                              Jumlah anggota keluarga: {w.jumlahOrang} Orang • Total Iuran: {formatRp(36 * w.jumlahOrang * 10000)}
+                              Jumlah anggota keluarga: {w.jumlahOrang} Orang • Total Iuran: {formatRp(35 * w.jumlahOrang * 10000)}
                             </p>
                             
                             {/* Progress Bar */}
@@ -1449,16 +1449,16 @@ export default function AdminIuran() {
                     value={rekamData.tipe}
                     onChange={(e) => setRekamData(prev => ({ ...prev, tipe: e.target.value }))}
                   >
-                    <option value="semua">Iuran Warga + Iuran Makam Sekaligus</option>
-                    <option value="warga">Iuran Warga Bulanan Saja</option>
-                    <option value="makam">Iuran Makam Saja</option>
+                    <option value="semua">Iuran Makam + Iuran Perluasan Makam Sekaligus</option>
+                    <option value="warga">Iuran Makam Saja</option>
+                    <option value="makam">Iuran Perluasan Makam Saja</option>
                   </select>
                 </div>
 
-                {/* Detail Iuran Warga */}
+                {/* Detail Iuran Makam */}
                 {(rekamData.tipe === 'warga' || rekamData.tipe === 'semua') && (
                   <div className="p-4 border-2 border-black bg-secondary-container/20 space-y-3">
-                    <p className="font-display-bold text-xs uppercase text-zinc-500">Iuran Warga Bulanan (Rp 10.000 / KK / Bulan)</p>
+                    <p className="font-display-bold text-xs uppercase text-zinc-500">Iuran Makam (Rp 10.000 / KK / Bulan)</p>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block font-label-bold uppercase text-[9px] mb-1">Mulai Bulan</label>
@@ -1502,13 +1502,13 @@ export default function AdminIuran() {
                 {/* Detail Iuran Makam */}
                 {(rekamData.tipe === 'makam' || rekamData.tipe === 'semua') && (
                   <div className="p-4 border-2 border-black bg-tertiary-fixed/20 space-y-3">
-                    <p className="font-display-bold text-xs uppercase text-zinc-500">Iuran Makam (Rp 10.000 / Orang / Bulan)</p>
+                    <p className="font-display-bold text-xs uppercase text-zinc-500">Iuran Perluasan Makam (Rp 10.000 / Orang / Bulan)</p>
                     <div>
                       <label className="block font-label-bold uppercase text-[9px] mb-1">Jumlah Bulan yang Ingin Dibayar</label>
                       <input
                         type="number"
                         min="1"
-                        max="36"
+                        max="35"
                         className="w-full border-2 border-black p-2 font-bold text-xs bg-white"
                         value={rekamData.jumlahBulanMakam}
                         onChange={(e) => setRekamData(prev => ({ ...prev, jumlahBulanMakam: Math.max(1, parseInt(e.target.value) || 1) }))}
@@ -1564,7 +1564,7 @@ export default function AdminIuran() {
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="font-bold text-zinc-500 uppercase">Tipe</span>
-                    <span className="font-bold uppercase">{deleteTarget.tipe === 'warga' ? 'Iuran Warga' : 'Iuran Makam'}</span>
+                    <span className="font-bold uppercase">{deleteTarget.tipe === 'warga' ? 'Iuran Makam' : 'Iuran Perluasan Makam'}</span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="font-bold text-zinc-500 uppercase">Detail</span>

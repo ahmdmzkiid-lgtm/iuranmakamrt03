@@ -46,9 +46,13 @@ export default function AdminDashboard() {
 
   const pendingItems = dataIuran.filter(i => i.status === 'pending')
 
+  const wargaDisplayValue = currentMonth === 6
+    ? `${statistik?.iuranWarga?.sudahBayar || 0} / ${statistik?.totalKK || 0} KK`
+    : `${statistik?.iuranWarga?.sudahBayar || 0} / ${statistik?.totalWarga || 0} KK`
+
   const quickStats = [
     { label: 'Warga Aktif', value: loading ? '...' : (statistik?.totalWarga?.toString() || '0'), icon: 'groups', bg: 'bg-primary-container', text: 'text-white' },
-    { label: `Iuran Warga ${getBulanName(currentMonth)}`, value: loading ? '...' : `${statistik?.iuranWarga?.sudahBayar || 0} / ${statistik?.totalWarga || 0} KK`, icon: 'payments', bg: 'bg-secondary-container', text: 'text-black' },
+    { label: `Iuran Makam ${getBulanName(currentMonth)}`, value: loading ? '...' : wargaDisplayValue, icon: 'payments', bg: 'bg-secondary-container', text: 'text-black' },
     { label: 'Pending Verifikasi', value: loading ? '...' : (statistik?.pendingVerifikasi?.toString() || '0'), icon: 'pending_actions', bg: 'bg-tertiary-fixed', text: 'text-black' },
     { label: 'Total Dana Makam', value: loading ? '...' : formatRp(statistik?.iuranMakam?.totalPendapatan || 0), icon: 'receipt_long', bg: 'bg-white', text: 'text-black' },
   ]
@@ -58,7 +62,7 @@ export default function AdminDashboard() {
     .slice(0, 4)
     .map(i => ({
       waktu: i.tanggalBayar ? new Date(i.tanggalBayar).toLocaleDateString('id-ID') : '-',
-      judul: `${i.warga?.user?.nama || 'Warga'} membayar ${i.tipe === 'warga' ? 'Iuran Warga' : 'Iuran Makam'}`,
+      judul: `${i.warga?.user?.nama || 'Warga'} membayar ${i.tipe === 'warga' ? 'Iuran Makam' : 'Iuran Perluasan Makam'}`,
       detail: `${formatRp(i.jumlah)} • ${i.metode || 'Transfer'}`
     }))
 
@@ -70,7 +74,7 @@ export default function AdminDashboard() {
           <div>
             <h1 className="font-display-bold text-3xl md:text-4xl uppercase leading-none">Dashboard Admin</h1>
             <p className="font-body-lg text-zinc-600 mt-2">
-              Ringkasan administrasi portal Iuran Makam & Warga RT 03.
+              Ringkasan administrasi portal Iuran Makam RT 03.
             </p>
           </div>
           <div className="text-right hidden md:block">
@@ -156,7 +160,7 @@ export default function AdminDashboard() {
                 <div className="bg-white border-2 border-black p-3 flex justify-between items-center gap-2">
                   <div className="min-w-0">
                     <p className="font-bold text-sm">{statistik?.iuranWarga?.belumBayar || 0} Warga Belum Bayar</p>
-                    <p className="text-[10px] text-zinc-500 uppercase">Iuran Warga Bulan Ini</p>
+                    <p className="text-[10px] text-zinc-500 uppercase">Iuran Makam Bulan Ini</p>
                   </div>
                   <Link to="/admin/notifikasi" className="bg-tertiary-fixed text-black border-2 border-black px-3 py-1 font-label-bold uppercase text-[10px] shrink-0">
                     Kirim Notif

@@ -46,12 +46,12 @@ export default function WargaMakam() {
               <p className="font-label-bold text-[10px] uppercase text-white opacity-70 mt-1">Total Anggota Keluarga</p>
             </div>
 
-            {/* Stats Card - Progress Iuran Makam */}
+            {/* Stats Card - Progress Iuran Perluasan Makam */}
             <div className={`border-4 border-black p-4 md:p-6 neubrutal-shadow flex flex-col items-start gap-1 ${wargaData?.sisaBulanMakam === 0 ? 'bg-green-500' : 'bg-tertiary-fixed'}`}>
               <span className="material-symbols-outlined text-3xl mb-2">payments</span>
-              <p className="font-display-bold text-2xl md:text-headline-lg">{wargaData?.bulanMakamLunas || 0}/{wargaData?.totalBulanMakam || 36} Bulan</p>
+              <p className="font-display-bold text-2xl md:text-headline-lg">{wargaData?.bulanMakamLunas || 0}/{wargaData?.totalBulanMakam || 35} Bulan</p>
               <p className="font-label-bold text-[10px] uppercase opacity-70 mt-1">
-                {wargaData?.sisaBulanMakam === 0 ? 'IURAN MAKAM LUNAS' : `Sisa ${wargaData?.sisaBulanMakam || 36} bulan lagi`}
+                {wargaData?.sisaBulanMakam === 0 ? 'IURAN MAKAM LUNAS' : `Sisa ${wargaData?.sisaBulanMakam || 35} bulan lagi`}
               </p>
             </div>
 

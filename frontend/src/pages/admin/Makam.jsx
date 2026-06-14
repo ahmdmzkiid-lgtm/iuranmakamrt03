@@ -132,7 +132,7 @@ export default function AdminMakam() {
       // 4. Populate Data Rows starting from Row 5
       filteredWarga.forEach((w, idx) => {
         const lunasBulan = w.bulanMakamTerbayar || 0
-        const progressString = `${lunasBulan}/36`
+        const progressString = `${lunasBulan}/35`
 
         const dataRow = worksheet.getRow(5 + idx)
         dataRow.getCell(1).value = idx + 1
@@ -223,7 +223,7 @@ export default function AdminMakam() {
                 <tr className="bg-zinc-200 border-b-4 border-black font-label-bold text-xs uppercase">
                   <th className="p-4">Nama Warga (KK)</th>
                   <th className="p-4 text-center">Jml Anggota</th>
-                  <th className="p-4 text-center">Iuran Makam</th>
+                  <th className="p-4 text-center">Iuran Perluasan Makam</th>
                   <th className="p-4">No Rumah</th>
                 </tr>
               </thead>
@@ -241,7 +241,7 @@ export default function AdminMakam() {
                 ) : (
                   paginatedWarga.map((warga) => {
                     const lunasBulan = warga.bulanMakamTerbayar || 0
-                    const sisaBulan = Math.max(0, 36 - lunasBulan)
+                    const sisaBulan = Math.max(0, 35 - lunasBulan)
                     return (
                       <tr key={warga.id} className="border-b-2 border-zinc-200 hover:bg-zinc-50 transition-colors align-top">
                         <td className="p-4">
@@ -256,7 +256,7 @@ export default function AdminMakam() {
                         <td className="p-4 text-center">
                           <div className="flex flex-col items-center gap-1">
                             <span className={`inline-block border-2 border-black px-2 py-1 font-display-bold text-sm ${sisaBulan === 0 ? 'bg-green-500 text-white' : sisaBulan <= 6 ? 'bg-tertiary-fixed text-black' : 'bg-zinc-100 text-black'}`}>
-                              {lunasBulan}/36
+                              {lunasBulan}/35
                             </span>
                             <span className="text-[10px] text-zinc-500">
                               {sisaBulan === 0 ? 'LUNAS' : `Sisa ${sisaBulan} bln`}

@@ -164,28 +164,28 @@ export default function WargaTagihan() {
               
               {/* Status & Progress Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Iuran Warga Info */}
+                {/* Iuran Makam Info */}
                 <div className="border-4 border-black p-4 bg-zinc-50 flex items-start gap-4">
                   <div className="w-10 h-10 bg-secondary-container border-2 border-black flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-xl">groups</span>
                   </div>
                   <div>
-                    <h3 className="font-headline-md uppercase text-xs">Iuran Bulanan Warga</h3>
+                    <h3 className="font-headline-md uppercase text-xs">Iuran Makam (Bulanan)</h3>
                     <p className="text-[10px] font-bold text-zinc-500 mt-1 uppercase">
                       Bulan {getBulanName(summary?.iuranWarga?.bulanIni)}: {summary?.iuranWarga?.sudahBayar ? 'LUNAS' : 'BELUM BAYAR'}
                     </p>
                   </div>
                 </div>
 
-                {/* Iuran Makam Progress */}
+                {/* Iuran Perluasan Makam Progress */}
                 <div className="border-4 border-black p-4 bg-zinc-50 flex items-start gap-4">
                   <div className="w-10 h-10 bg-tertiary-fixed border-2 border-black flex items-center justify-center shrink-0">
                     <img src="/tombstone.webp" alt="Makam" className="w-6 h-6" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-headline-md uppercase text-xs">Iuran Makam (36 Bln)</h3>
+                    <h3 className="font-headline-md uppercase text-xs">Iuran Perluasan Makam (35 Bln)</h3>
                     <p className="text-[10px] font-bold text-zinc-500 mt-1 uppercase">
-                      {summary?.warga?.bulanMakamTerbayar}/36 Bulan Terbayar
+                      {summary?.warga?.bulanMakamTerbayar}/35 Bulan Terbayar
                     </p>
                     <p className="text-[9px] font-bold text-error mt-0.5 uppercase">
                       Sisa {summary?.warga?.sisaBulanMakam} bulan wajib bayar
@@ -211,7 +211,7 @@ export default function WargaTagihan() {
                       } ${summary?.iuranWarga?.sudahBayar ? 'opacity-40 cursor-not-allowed' : ''}`}
                     >
                       <span className="material-symbols-outlined text-lg">groups</span>
-                      Iuran Warga
+                      Iuran Perluasan Makam
                     </button>
                     <button
                       type="button"
@@ -222,7 +222,7 @@ export default function WargaTagihan() {
                       } ${summary?.warga?.makamLunas ? 'opacity-40 cursor-not-allowed' : ''}`}
                     >
                       <img src="/tombstone.webp" alt="Makam" className="w-5 h-5" />
-                      Iuran Makam
+                      Iuran Perluasan Makam
                     </button>
                     <button
                       type="button"
@@ -238,10 +238,10 @@ export default function WargaTagihan() {
                   </div>
                 </div>
 
-                {/* 2. Detail Pembayaran Iuran Warga */}
+                {/* 2. Detail Pembayaran Iuran Makam */}
                 {(payType === 'warga' || payType === 'semua') && !summary?.iuranWarga?.sudahBayar && (
                   <div className="border-4 border-black p-4 bg-secondary-container/20 space-y-4">
-                    <p className="font-display-bold text-xs uppercase text-zinc-500">Form Iuran Bulanan Warga (Rp 10.000 / KK / Bulan)</p>
+                    <p className="font-display-bold text-xs uppercase text-zinc-500">Form Iuran Makam (Rp 10.000 / KK / Bulan)</p>
                     
                     {/* Start month & year selection */}
                     <div className="grid grid-cols-2 gap-4">
@@ -338,10 +338,10 @@ export default function WargaTagihan() {
                   </div>
                 )}
 
-                {/* 3. Detail Pembayaran Iuran Makam */}
+                {/* 3. Detail Pembayaran Iuran Perluasan Makam */}
                 {(payType === 'makam' || payType === 'semua') && !summary?.warga?.makamLunas && (
                   <div className="border-4 border-black p-4 bg-tertiary-fixed/20 space-y-4">
-                    <p className="font-display-bold text-xs uppercase text-zinc-500">Form Cicilan Iuran Makam</p>
+                    <p className="font-display-bold text-xs uppercase text-zinc-500">Form Cicilan Iuran Perluasan Makam</p>
                     <div>
                       <div className="flex justify-between items-baseline mb-2">
                         <label className="block font-label-bold uppercase text-[10px] text-zinc-500">Pilih Jumlah Bulan yang Ingin Dibayarkan</label>

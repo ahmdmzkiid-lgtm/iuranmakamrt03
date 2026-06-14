@@ -4,7 +4,7 @@ import api from '../../services/api'
 
 const formatRp = (n) => 'Rp ' + Number(n).toLocaleString('id-ID')
 
-const filterOptions = ['Semua', 'Iuran Warga', 'Iuran Makam']
+const filterOptions = ['Semua', 'Iuran Makam', 'Iuran Perluasan Makam']
 
 const getBulanName = (bln) => {
   const bulan = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
@@ -51,7 +51,7 @@ export default function WargaKuitansi() {
           let periodeStr = ''
           
           if (wargaItems.length > 0 && makamItems.length > 0) {
-            jenis = 'Iuran Warga + Iuran Makam'
+            jenis = 'Iuran Makam + Iuran Perluasan Makam'
             icon = 'payments'
             
             // Warga period
@@ -66,7 +66,7 @@ export default function WargaKuitansi() {
             const totalMakamBulan = makamItems.reduce((sum, i) => sum + (i.jumlahBulan || 0), 0)
             periodeStr = `${wargaPeriode} / Makam (${totalMakamBulan} bulan)`
           } else if (wargaItems.length > 0) {
-            jenis = 'Iuran Warga'
+            jenis = 'Iuran Makam'
             icon = 'groups'
             
             wargaItems.sort((a, b) => (a.tahun - b.tahun) || (a.bulan - b.bulan))
@@ -76,7 +76,7 @@ export default function WargaKuitansi() {
               periodeStr += ` - ${getBulanName(last.bulan)} ${last.tahun}`
             }
           } else {
-            jenis = 'Iuran Makam'
+            jenis = 'Iuran Perluasan Makam'
             icon = 'deceased'
             
             const totalMakamBulan = makamItems.reduce((sum, i) => sum + (i.jumlahBulan || 0), 0)
@@ -467,7 +467,7 @@ export default function WargaKuitansi() {
                 </h4>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-zinc-600 font-bold">Iuran Warga</span>
+                    <span className="text-zinc-600 font-bold">Iuran Makam</span>
                     <span className="font-bold">
                       {formatRp(
                         kuitansiData.reduce((s, k) => s + (k.wargaNominal || 0), 0)

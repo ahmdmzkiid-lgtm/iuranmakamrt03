@@ -52,9 +52,9 @@ export default function WargaDashboard() {
     .slice(0, 3)
     .map(item => ({
       tanggal: item.tanggalBayar ? new Date(item.tanggalBayar).toLocaleDateString('id-ID') : '-',
-      deskripsi: item.tipe === 'warga' 
-        ? `Iuran Warga Bulan ${getBulanName(item.bulan)} ${item.tahun}`
-        : `Iuran Makam (${item.jumlahBulan} Bulan)`,
+      deskripsi: item.tipe === 'warga'
+        ? `Iuran Makam Bulan ${getBulanName(item.bulan)} ${item.tahun}`
+        : `Iuran Perluasan Makam (${item.jumlahBulan} Bulan)`,
       metode: item.metode || '-',
       jumlah: formatRp(item.jumlah),
       status: item.status
@@ -83,12 +83,12 @@ export default function WargaDashboard() {
           <div className="md:col-span-8 space-y-6">
             {/* Row 1: Iuran Warga & Makam Overview */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {/* Iuran Warga Bulanan status */}
+              {/* Iuran Makam Bulanan status */}
               <div className="bg-secondary-container border-4 border-black p-4 neubrutal-shadow flex flex-col justify-between h-48">
                 <div>
                   <div className="flex justify-between items-start">
                     <span className="bg-white border-2 border-black px-2 py-0.5 text-[9px] font-black uppercase">
-                      Iuran Warga (Bulanan)
+                      Iuran Makam (Bulanan)
                     </span>
                     {summary?.iuranWarga?.sudahBayar ? (
                       <span className="bg-secondary text-white border-2 border-black px-2 py-0.5 text-[9px] font-black uppercase">
@@ -111,20 +111,20 @@ export default function WargaDashboard() {
                 </button>
               </div>
 
-              {/* Progress Makam */}
+              {/* Progress Perluasan Makam */}
               <div className="bg-tertiary-fixed border-4 border-black p-4 neubrutal-shadow flex flex-col justify-between h-48">
                 <div>
                   <div className="flex justify-between items-start">
                     <span className="bg-white border-2 border-black px-2 py-0.5 text-[9px] font-black uppercase">
-                      Iuran Makam (36 Bulan)
+                      Iuran Perluasan Makam (35 Bulan)
                     </span>
                     {summary?.warga?.makamLunas ? (
                       <span className="bg-secondary text-white border-2 border-black px-2 py-0.5 text-[9px] font-black uppercase">
-                        Lunas 36 Bln
+                        Lunas 35 Bln
                       </span>
                     ) : (
                       <span className="bg-primary text-white border-2 border-black px-2 py-0.5 text-[9px] font-black uppercase">
-                        {summary?.warga?.bulanMakamTerbayar}/36 Bulan
+                        {summary?.warga?.bulanMakamTerbayar}/35 Bulan
                       </span>
                     )}
                   </div>
@@ -178,7 +178,7 @@ export default function WargaDashboard() {
                 <p className="text-[10px] text-zinc-500 font-bold uppercase mt-0.5">(Kepala Keluarga + Anggota)</p>
               </div>
               <div>
-                <p className="font-label-bold text-xs uppercase text-zinc-500">Iuran Makam per Bulan</p>
+                <p className="font-label-bold text-xs uppercase text-zinc-500">Iuran Perluasan Makam per Bulan</p>
                 <p className="font-body-lg font-bold text-sm md:text-base">
                   {summary ? formatRp(summary.warga.jumlahOrang * 10000) : '...'}
                 </p>
@@ -273,7 +273,7 @@ export default function WargaDashboard() {
             <div className="p-6 space-y-4 flex-1 overflow-y-auto">
               <div className="bg-secondary-container border-2 border-black p-4 mb-4 neubrutal-shadow-sm">
                 <p className="font-body-md text-sm text-black">
-                  👋 <span className="font-display-bold uppercase">Selamat datang di Aplikasi Iuran Makam & RT 03!</span> <br />
+                  👋 <span className="font-display-bold uppercase">Selamat datang di Aplikasi Iuran Makam RT 03!</span> <br />
                   Akun Anda telah diaktifkan dengan password baru. Berikut langkah utama untuk membayar iuran:
                 </p>
               </div>

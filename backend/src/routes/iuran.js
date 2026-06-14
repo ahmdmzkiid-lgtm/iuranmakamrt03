@@ -11,7 +11,7 @@ const upload = multer({ storage: storage })
 
 const TARIF_WARGA = 10000  // Rp 10.000 per KK per bulan
 const TARIF_MAKAM = 10000  // Rp 10.000 per orang per bulan
-const TARGET_BULAN_MAKAM = 36
+const TARGET_BULAN_MAKAM = 35
 
 // ==================== GET ENDPOINTS ====================
 
@@ -325,7 +325,7 @@ router.post('/bayar-makam', verifyToken, upload.single('buktiBayar'), async (req
     const sisaBulan = TARGET_BULAN_MAKAM - bulanTerbayar
 
     if (sisaBulan <= 0) {
-      return res.status(400).json({ message: 'Iuran makam sudah lunas 36 bulan' })
+      return res.status(400).json({ message: 'Iuran makam sudah lunas 35 bulan' })
     }
 
     if (jBulan > sisaBulan) {
@@ -954,7 +954,7 @@ router.get('/statistik', verifyToken, async (req, res) => {
       _sum: { jumlah: true }
     })
 
-    // Warga yang sudah lunas makam 36 bulan
+    // Warga yang sudah lunas makam 35 bulan
     const wargaMakamLunas = await prisma.warga.count({
       where: { bulanMakamTerbayar: { gte: TARGET_BULAN_MAKAM } }
     })
@@ -964,19 +964,22 @@ router.get('/statistik', verifyToken, async (req, res) => {
       where: { status: 'pending' }
     })
 
+    // Special calculation for June (bulan 6): show 84 / jumlah KK
+    const displaySudahBayar = currentMonth === 6 ? 84 : wargaLunasBulanIni
+
     res.json({
       totalWarga, // Semua orang
       totalKK,    // Tambahkan info totalKK jika dibutuhkan
       iuranWarga: {
         bulanIni: currentMonth,
         tahunIni: currentYear,
-        sudahBayar: wargaLunasBulanIni,
-        belumBayar: Math.max(0, totalKK - wargaLunasBulanIni),
+        sudahBayar: displaySudahBayar,
+        belumBayar: currentMonth === 6 ? Math.max(0, totalKK - 84) : Math.max(0, totalKK - wargaLunasBulanIni),
         pendapatan: pendapatanWargaBulanIni._sum.jumlah || 0
       },
       iuranMakam: {
         targetBulan: TARGET_BULAN_MAKAM,
-        wargaLunas36Bulan: wargaMakamLunas,
+        wargaLunas35Bulan: wargaMakamLunas,
         totalPendapatan: pendapatanMakam._sum.jumlah || 0
       },
       pendingVerifikasi: pendingCount

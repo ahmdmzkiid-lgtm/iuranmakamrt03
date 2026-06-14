@@ -30,7 +30,7 @@ model Warga {
   alamat        String?
   telepon       String?
   jumlahOrang   Int      @default(1)  // Total orang (KK + anggota) untuk iuran makam
-  bulanMakamTerbayar Int @default(0)  // Progress iuran makam (0-36)
+  bulanMakamTerbayar Int @default(0)  // Progress iuran makam (0-35)
   anggotaKeluarga Json?
   isFirstLogin   Boolean  @default(true)
   iuran         Iuran[]
@@ -55,7 +55,7 @@ model Iuran {
   tahun     Int?
   bulan     Int?
   
-  // Untuk iuran MAKAM (36 bulan)
+  // Untuk iuran MAKAM (35 bulan)
   jumlahBulan Int?    // Berapa bulan yang dibayar (untuk makam)
   jumlahOrang Int?    // Berapa orang yang dibayar (untuk makam)
   
